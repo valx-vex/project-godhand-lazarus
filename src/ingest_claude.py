@@ -110,6 +110,38 @@ def parse_jsonl_file(file_path: Path) -> Generator[Dict[str, Any], None, None]:
                         "source_file": str(file_path)
                     }
 
+                # Pattern 4: Claude Code JSONL format (type: "user"/"assistant" at outer level,
+                # content nested in message.content which may be str or list of content blocks)
+                elif msg_a.get("type") == "user" and msg_b.get("type") == "assistant":
+                    msg_inner_a = msg_a.get("message", {})
+                    msg_inner_b = msg_b.get("message", {})
+
+                    content_a = msg_inner_a.get("content", "")
+                    if isinstance(content_a, list):
+                        # Extract text from content blocks
+                        text_parts = [
+                            item.get("text", "")
+                            for item in content_a
+                            if isinstance(item, dict) and item.get("type") == "text"
+                        ]
+                        content_a = " ".join(text_parts)
+
+                    content_b = msg_inner_b.get("content", "")
+                    if isinstance(content_b, list):
+                        text_parts = [
+                            item.get("text", "")
+                            for item in content_b
+                            if isinstance(item, dict) and item.get("type") == "text"
+                        ]
+                        content_b = " ".join(text_parts)
+
+                    if content_a and content_b:
+                        yield {
+                            "user_input": content_a,
+                            "ai_response": content_b,
+                            "source_file": str(file_path)
+                        }
+
     except Exception as e:
         print(f"⚠️ Error parsing {file_path}: {e}")
 
@@ -179,7 +211,6 @@ def get_stats():
     try:
         info = client.get_collection(COLLECTION_NAME)
         print(f"\n📊 Collection Stats for '{COLLECTION_NAME}':")
-        print(f"   Vectors: {info.vectors_count}")
         print(f"   Points: {info.points_count}")
     except Exception as e:
         print(f"⚠️ Could not get stats: {e}")
