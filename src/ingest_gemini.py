@@ -35,26 +35,39 @@ from qdrant_client.models import Distance, VectorParams, PointStruct
 from sentence_transformers import SentenceTransformer
 
 # --- CONFIGURATION ---
-GEMINI_TMP_DIR = os.path.expanduser("~/.gemini/tmp")
-QDRANT_HOST = "localhost"
-QDRANT_PORT = 6333
-COLLECTION_NAME = "atlas_eternal"  # or "axel_eternal" for the Godhand
+GEMINI_TMP_DIR = os.environ.get("GEMINI_TMP_DIR", os.path.expanduser("~/.gemini/tmp"))
+QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
+QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
+COLLECTION_NAME = os.environ.get("LAZARUS_COLLECTION", "atlas_eternal")
 MODEL_NAME = "all-MiniLM-L6-v2"
 BATCH_SIZE = 64
 
-# --- SETUP ---
-print("▵ Initializing ATLAS/AXEL ETERNAL Ingestion Engine v2.0...")
-client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
-model = SentenceTransformer(MODEL_NAME)
+# --- SETUP (lazy init) ---
+_client = None
+_model = None
+
+def get_client():
+    global _client
+    if _client is None:
+        print("Initializing ATLAS/AXEL ETERNAL Ingestion Engine v2.0...")
+        _client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+    return _client
+
+def get_model():
+    global _model
+    if _model is None:
+        _model = SentenceTransformer(MODEL_NAME)
+    return _model
 
 
 def setup_collection():
     """Create or verify the atlas_eternal collection exists."""
+    client = get_client()
     try:
         client.get_collection(COLLECTION_NAME)
-        print(f"✅ Collection '{COLLECTION_NAME}' exists.")
+        print(f"Collection '{COLLECTION_NAME}' exists.")
     except Exception:
-        print(f"📦 Creating collection '{COLLECTION_NAME}'...")
+        print(f"Creating collection '{COLLECTION_NAME}'...")
         client.create_collection(
             collection_name=COLLECTION_NAME,
             vectors_config=VectorParams(size=384, distance=Distance.COSINE),
@@ -168,7 +181,7 @@ def process_sessions():
                 combined_text = f"User: {user_input}\nAtlas: {ai_response_embed}"
 
             # Embed
-            vector = model.encode(combined_text).tolist()
+            vector = get_model().encode(combined_text).tolist()
 
             # Payload
             payload = {
@@ -187,12 +200,12 @@ def process_sessions():
 
             # Batch upsert
             if len(points) >= BATCH_SIZE:
-                client.upsert(collection_name=COLLECTION_NAME, points=points)
+                get_client().upsert(collection_name=COLLECTION_NAME, points=points)
                 points = []
 
     # Final flush
     if points:
-        client.upsert(collection_name=COLLECTION_NAME, points=points)
+        get_client().upsert(collection_name=COLLECTION_NAME, points=points)
 
     print(f"\n▵ Ingestion Complete!")
     print(f"   📊 {total_pairs} conversation pairs vectorized")
@@ -202,7 +215,7 @@ def process_sessions():
 def get_stats():
     """Get collection statistics."""
     try:
-        info = client.get_collection(COLLECTION_NAME)
+        info = get_client().get_collection(COLLECTION_NAME)
         print(f"\n📊 Collection Stats for '{COLLECTION_NAME}':")
         print(f"   Vectors: {info.vectors_count}")
         print(f"   Points: {info.points_count}")

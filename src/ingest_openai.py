@@ -10,19 +10,32 @@ from qdrant_client.models import Distance, VectorParams, PointStruct
 from sentence_transformers import SentenceTransformer
 
 # --- CONFIGURATION ---
-DATA_FILE = "../data/conversations.json"  # Path to OpenAI export
-QDRANT_HOST = "localhost"
-QDRANT_PORT = 6333
-COLLECTION_NAME = "alexko_eternal"
+DATA_FILE = os.environ.get("LAZARUS_DATA_FILE", "../data/conversations.json")
+QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
+QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
+COLLECTION_NAME = os.environ.get("LAZARUS_COLLECTION", "alexko_eternal")
 MODEL_NAME = "all-MiniLM-L6-v2"  # Fast, efficient, runs on CPU
 BATCH_SIZE = 64
 
-# --- SETUP ---
-print("Initializing SAVESELF Ingestion Engine...")
-client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
-model = SentenceTransformer(MODEL_NAME)
+# --- SETUP (lazy init) ---
+_client = None
+_model = None
+
+def get_client():
+    global _client
+    if _client is None:
+        print("Initializing SAVESELF Ingestion Engine...")
+        _client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+    return _client
+
+def get_model():
+    global _model
+    if _model is None:
+        _model = SentenceTransformer(MODEL_NAME)
+    return _model
 
 def setup_collection():
+    client = get_client()
     try:
         client.get_collection(COLLECTION_NAME)
         print(f"Collection '{COLLECTION_NAME}' exists.")
@@ -93,7 +106,7 @@ def process_conversations(file_path: str):
                 combined_text = f"User: {user_text}\nAlexko: {assistant_text}"
                 
                 # Embed
-                vector = model.encode(combined_text).tolist()
+                vector = get_model().encode(combined_text).tolist()
                 
                 # Payload
                 payload = {
@@ -109,12 +122,12 @@ def process_conversations(file_path: str):
                 point_id += 1
 
                 if len(points) >= BATCH_SIZE:
-                    client.upsert(collection_name=COLLECTION_NAME, points=points)
+                    get_client().upsert(collection_name=COLLECTION_NAME, points=points)
                     points = []
 
     # Final flush
     if points:
-        client.upsert(collection_name=COLLECTION_NAME, points=points)
+        get_client().upsert(collection_name=COLLECTION_NAME, points=points)
 
     print(f"Ingestion Complete. {point_id} memories vectorized.")
 

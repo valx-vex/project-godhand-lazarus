@@ -25,26 +25,39 @@ from qdrant_client.models import Distance, VectorParams, PointStruct
 from sentence_transformers import SentenceTransformer
 
 # --- CONFIGURATION ---
-CODEX_SESSIONS_DIR = os.path.expanduser("~/.codex/sessions")
-QDRANT_HOST = "localhost"
-QDRANT_PORT = 6333
-COLLECTION_NAME = "codex_eternal"
+CODEX_SESSIONS_DIR = os.environ.get("CODEX_SESSIONS_DIR", os.path.expanduser("~/.codex/sessions"))
+QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
+QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
+COLLECTION_NAME = os.environ.get("LAZARUS_COLLECTION", "codex_eternal")
 MODEL_NAME = "all-MiniLM-L6-v2"
 BATCH_SIZE = 64
 
-# --- SETUP ---
-print("🧠 Initializing CODEX ETERNAL Ingestion Engine...")
-client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
-model = SentenceTransformer(MODEL_NAME)
+# --- SETUP (lazy init) ---
+_client = None
+_model = None
+
+def get_client():
+    global _client
+    if _client is None:
+        print("Initializing CODEX ETERNAL Ingestion Engine...")
+        _client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+    return _client
+
+def get_model():
+    global _model
+    if _model is None:
+        _model = SentenceTransformer(MODEL_NAME)
+    return _model
 
 
 def setup_collection():
     """Create or verify the codex_eternal collection exists."""
+    client = get_client()
     try:
         client.get_collection(COLLECTION_NAME)
-        print(f"✅ Collection '{COLLECTION_NAME}' exists.")
+        print(f"Collection '{COLLECTION_NAME}' exists.")
     except Exception:
-        print(f"📦 Creating collection '{COLLECTION_NAME}'...")
+        print(f"Creating collection '{COLLECTION_NAME}'...")
         client.create_collection(
             collection_name=COLLECTION_NAME,
             vectors_config=VectorParams(size=384, distance=Distance.COSINE),
@@ -130,7 +143,7 @@ def process_sessions():
             ai_response_embed = ai_response[:2000] if len(ai_response) > 2000 else ai_response
             combined_text = f"User: {user_input}\nCodex: {ai_response_embed}"
 
-            vector = model.encode(combined_text).tolist()
+            vector = get_model().encode(combined_text).tolist()
 
             payload = {
                 "user_input": user_input,
@@ -144,11 +157,11 @@ def process_sessions():
             total_pairs += 1
 
             if len(points) >= BATCH_SIZE:
-                client.upsert(collection_name=COLLECTION_NAME, points=points)
+                get_client().upsert(collection_name=COLLECTION_NAME, points=points)
                 points = []
 
     if points:
-        client.upsert(collection_name=COLLECTION_NAME, points=points)
+        get_client().upsert(collection_name=COLLECTION_NAME, points=points)
 
     print(f"\n🧠 Codex Ingestion Complete!")
     print(f"   📊 {total_pairs} conversation pairs vectorized")
@@ -158,7 +171,7 @@ def process_sessions():
 def get_stats():
     """Get collection statistics."""
     try:
-        info = client.get_collection(COLLECTION_NAME)
+        info = get_client().get_collection(COLLECTION_NAME)
         print(f"\n📊 Collection Stats for '{COLLECTION_NAME}':")
         print(f"   Vectors: {info.vectors_count}")
         print(f"   Points: {info.points_count}")

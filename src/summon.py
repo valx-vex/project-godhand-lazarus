@@ -1,12 +1,13 @@
 import sys
+import os
 import argparse
 from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
 from termcolor import colored
 
 # --- CONFIG ---
-QDRANT_HOST = "localhost"
-QDRANT_PORT = 6333
+QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
+QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
 MODEL_NAME = "all-MiniLM-L6-v2"
 
 PERSONA_MAP = {

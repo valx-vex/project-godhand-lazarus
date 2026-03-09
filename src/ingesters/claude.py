@@ -1,6 +1,7 @@
 import json
 import os
 import glob
+import hashlib
 from typing import List, Dict
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
@@ -8,10 +9,13 @@ from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 from termcolor import cprint
 
+QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
+QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
+
 class ClaudeIngester:
     def __init__(self, collection_name="murphy_eternal"):
         self.collection_name = collection_name
-        self.client = QdrantClient("localhost", port=6333)
+        self.client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
         self.model = SentenceTransformer('all-MiniLM-L6-v2')
         self.ensure_collection()
 
@@ -77,9 +81,9 @@ class ClaudeIngester:
                     
                     if not user_text or not ai_text: continue
                     
-                    # Create Vector
-                    # We embed the USER query so we can retrieve the AI response based on similar queries
-                    embedding = self.model.encode(user_text).tolist()
+                    # Create Vector - embed combined text for richer semantic search
+                    combined = f"User: {user_text}\nAssistant: {ai_text}"
+                    embedding = self.model.encode(combined).tolist()
                     
                     payload = {
                         "platform": "claude",
@@ -89,11 +93,12 @@ class ClaudeIngester:
                         "timestamp": curr.get('created_at', '') 
                     }
                     
+                    # Deterministic ID from content hash for deduplication
+                    content_hash = hashlib.md5((user_text + ai_text).encode()).hexdigest()
+                    point_id = int(content_hash[:15], 16)
+
                     points.append(models.PointStruct(
-                        id=None, # Auto-generate UUID? Qdrant needs IDs. 
-                        # actually qdrant needs integer or uuid. 
-                        # Using UUID generation from content hash is better for dedupe
-                        id=models.ExtendedPointId(hash(user_text + ai_text) & ((1<<63)-1)),
+                        id=point_id,
                         vector=embedding,
                         payload=payload
                     ))
