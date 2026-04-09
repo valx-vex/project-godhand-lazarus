@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - codex/**
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Syntax check Python sources
+        run: python -m compileall src scripts mcp_server daemon
+
+      - name: Syntax check shell scripts
+        run: |
+          bash -n setup.sh
+          bash -n daemon/install_daemon.sh
+          for script in scripts/*.sh; do
+            bash -n "$script"
+          done
+
+      - name: Smoke test CLI wrappers
+        run: |
+          python scripts/check_memory_stack.py --help >/dev/null
+          python scripts/configure_gemini_auth.py --help >/dev/null
+          python scripts/register_lazarus_mcp.py --help >/dev/null

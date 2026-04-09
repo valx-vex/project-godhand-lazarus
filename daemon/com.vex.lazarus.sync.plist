@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.vex.lazarus.sync</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__LAZARUS_PYTHON__</string>
+        <string>__LAZARUS_DAEMON_SCRIPT__</string>
+        <string>--daemon</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>__LAZARUS_STDOUT__</string>
+
+    <key>StandardErrorPath</key>
+    <string>__LAZARUS_STDERR__</string>
+
+    <key>WorkingDirectory</key>
+    <string>__LAZARUS_WORKDIR__</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+</dict>
+</plist>
