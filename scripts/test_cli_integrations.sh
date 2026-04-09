@@ -63,15 +63,15 @@ run_case() {
 
   local output
   if output="$("$@" 2>&1)"; then
-    if printf '%s\n' "$output" | rg -qi "$NEGATIVE_PATTERN"; then
+    if printf '%s\n' "$output" | rg -qi "$pattern"; then
+      PASS_COUNT=$((PASS_COUNT + 1))
+      print_case "PASS" "$label"
+      printf '%s\n' "$output" | tail -n 3
+    elif printf '%s\n' "$output" | rg -qi "$NEGATIVE_PATTERN"; then
       FAIL_COUNT=$((FAIL_COUNT + 1))
       print_case "FAIL" "$label"
       echo "Detected failure pattern: $NEGATIVE_PATTERN"
       printf '%s\n' "$output"
-    elif printf '%s\n' "$output" | rg -qi "$pattern"; then
-      PASS_COUNT=$((PASS_COUNT + 1))
-      print_case "PASS" "$label"
-      printf '%s\n' "$output" | tail -n 3
     else
       FAIL_COUNT=$((FAIL_COUNT + 1))
       print_case "FAIL" "$label"

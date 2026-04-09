@@ -73,7 +73,7 @@ If you've ever wished your AI could remember what you talked about last week, th
 
 ---
 
-**GitHub**: https://github.com/wearelegion1/project-godhand-lazarus
+**GitHub**: https://github.com/valx-vex/project-godhand-lazarus
 
 **Stack**: Python, Qdrant, SentenceTransformers, MCP
 

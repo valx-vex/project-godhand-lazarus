@@ -22,6 +22,7 @@ resolve_python() {
 }
 
 PYTHON_BIN="$(resolve_python)"
+OPENAI_EXPORT_PATH="${LAZARUS_DATA_FILE:-$PROJECT_ROOT/data/conversations.json}"
 
 if [[ -f "$PROJECT_ROOT/.env" ]]; then
   set -a
@@ -37,10 +38,12 @@ run_ingest() {
   "$PYTHON_BIN" "$PROJECT_ROOT/$script"
 }
 
-if [[ -f "$PROJECT_ROOT/data/conversations.json" ]]; then
+if [[ -f "$OPENAI_EXPORT_PATH" ]]; then
+  export LAZARUS_DATA_FILE="$OPENAI_EXPORT_PATH"
+  echo "==> ChatGPT export source: $LAZARUS_DATA_FILE"
   run_ingest "Ingesting ChatGPT export" "src/ingest_openai.py"
 else
-  echo "==> Skipping ChatGPT export (data/conversations.json not present)"
+  echo "==> Skipping ChatGPT export ($OPENAI_EXPORT_PATH not present)"
 fi
 
 run_ingest "Ingesting Claude sessions" "src/ingest_claude.py"

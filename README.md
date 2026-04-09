@@ -2,6 +2,9 @@
 
 Semantic resurrection for AI conversations, packaged as a real operator repo.
 
+Current release: `v0.1.0-beta.1`
+Release notes: [`docs/releases/v0.1.0-beta.1.md`](docs/releases/v0.1.0-beta.1.md)
+
 Godhand Lazarus ingests chat history from ChatGPT, Claude Code, Gemini CLI, and
 Codex CLI into Qdrant, then exposes that semantic memory through CLI search and
 MCP so any supported agent can recover past ideas, patterns, and persona voice.
@@ -29,7 +32,7 @@ can:
 ## Quick Start
 
 ```bash
-git clone https://github.com/wearelegion1/project-godhand-lazarus.git
+git clone https://github.com/valx-vex/project-godhand-lazarus.git
 cd project-godhand-lazarus
 ./scripts/install_local_stack.sh --tool all
 ./scripts/ingest_all.sh
@@ -97,12 +100,18 @@ All three point to the same repo wrapper: `scripts/run_lazarus_mcp.sh`.
 
 1. Export your data from ChatGPT.
 2. Extract `conversations.json`.
-3. Place it at `data/conversations.json`.
+3. Either place it at `data/conversations.json` or point Lazarus at the file directly.
 
 Then run:
 
 ```bash
 python3 src/ingest_openai.py
+```
+
+Or, without copying the export into the repo:
+
+```bash
+LAZARUS_DATA_FILE=/absolute/path/to/conversations.json ./scripts/ingest_all.sh
 ```
 
 ### Claude Code

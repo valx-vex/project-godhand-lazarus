@@ -196,6 +196,36 @@ def check_qdrant() -> tuple[bool, str]:
     return True, f"Qdrant reachable with {len(collections)} collections ({names}{suffix})"
 
 
+def check_semantic_collections() -> tuple[bool, str]:
+    required = [
+        "alexko_eternal",
+        "murphy_eternal",
+        "atlas_eternal",
+        "codex_eternal",
+    ]
+    counts: list[str] = []
+    missing: list[str] = []
+
+    for collection in required:
+        url = f"http://{QDRANT_HOST}:{QDRANT_PORT}/collections/{collection}"
+        try:
+            with urllib.request.urlopen(url, timeout=3) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+            missing.append(collection)
+            continue
+
+        result = payload.get("result", {})
+        points_count = result.get("points_count")
+        counts.append(f"{collection}={points_count}")
+
+    if missing:
+        detail = ", ".join(counts) if counts else "no semantic collections available"
+        return False, f"missing {', '.join(missing)} ({detail})"
+
+    return True, ", ".join(counts)
+
+
 def check_repo_assets() -> tuple[bool, str]:
     required = [
         WRAPPER,
@@ -250,7 +280,14 @@ def main() -> int:
     qdrant_ok, qdrant_detail = check_qdrant()
     print(f"[{'PASS' if qdrant_ok else 'FAIL'}] qdrant: {qdrant_detail}")
     if qdrant_ok:
-        core_score += 2.0
+        core_score += 1.0
+    else:
+        core_failed = True
+
+    collections_ok, collections_detail = check_semantic_collections()
+    print(f"[{'PASS' if collections_ok else 'FAIL'}] semantic collections: {collections_detail}")
+    if collections_ok:
+        core_score += 1.0
     else:
         core_failed = True
 
