@@ -8,12 +8,16 @@ build/
 data/conversations.json
 data/*.json
 .env
+.gemini/
+.claude/
+.codex/
 *.log
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 *.swp
+backups/
 
 # Internal development docs (not part of public release)
 ATLAS_*.md
@@ -24,6 +28,6 @@ HANDOFF_*.md
 IMPROVEMENT_PLAN_*.md
 LAZARUS_MCP_COMPLETE.md
 requirements-lite.txt
-daemon/
+daemon/*.log
+daemon/.sync_state.json
 templates/
-docs/

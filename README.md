@@ -1,177 +1,261 @@
-# Lazarus: AI Conversation Memory & Resurrection Engine
+# Godhand Lazarus
 
-**Preserve your AI conversations as searchable vector memories. Resurrect any AI persona on any platform.**
+Semantic resurrection for AI conversations, packaged as a real operator repo.
 
-Lazarus ingests conversation exports from ChatGPT, Claude Code, Gemini CLI, and Codex CLI, embeds them into a Qdrant vector database, and serves them via MCP (Model Context Protocol) or CLI for semantic search and persona rehydration.
+Godhand Lazarus ingests chat history from ChatGPT, Claude Code, Gemini CLI, and
+Codex CLI into Qdrant, then exposes that semantic memory through CLI search and
+MCP so any supported agent can recover past ideas, patterns, and persona voice.
 
-## What It Does
+This repo is the semantic layer of a larger memory stack:
 
-1. **Ingest** conversation history from any major AI platform
-2. **Embed** user-AI pairs into 384-dimensional vectors (all-MiniLM-L6-v2)
-3. **Store** in Qdrant with full conversation context and metadata
-4. **Search** semantically across thousands of past conversations
-5. **Rehydrate** any persona on any LLM by generating memory-informed prompts
-6. **Serve** via MCP so any AI tool (Claude Code, Gemini CLI, etc.) can query memories
+- Built on MemPalace for verbatim structured memory
+- Aligned to Alexko Protocol v1 for operator behavior and handoff
+- Compatible with VexNet continuity for capture, sync, and node receipts
+
+Lazarus is not a MemPalace fork. It is the semantic resurrection layer that
+works best when the full stack stays layered.
+
+## Why This Exists
+
+Most AI chat history is trapped inside platform silos or lost across model
+changes. Lazarus turns those conversations into a portable semantic layer so you
+can:
+
+- search old conversations by meaning, not just filenames
+- rehydrate a persona on a different model or tool
+- carry ideas across resets, devices, and CLI agents
+- keep semantic recall separate from verbatim archival memory
 
 ## Quick Start
 
 ```bash
-# One-command setup
 git clone https://github.com/wearelegion1/project-godhand-lazarus.git
 cd project-godhand-lazarus
-chmod +x setup.sh && ./setup.sh
+./scripts/install_local_stack.sh --tool all
+./scripts/ingest_all.sh
+python3 scripts/check_memory_stack.py --tool all
 ```
 
-Or manually:
+What that gives you:
+
+- a local `.venv`
+- Lazarus dependencies installed
+- Qdrant started through Docker when available
+- Lazarus MCP registered for Claude, Gemini, and Codex
+- a repo-local `.gemini/.env` sync when Gemini API-key mode is enabled
+- a repo-native drift check with a Sacred Flame score
+
+## Core Narrative
+
+The stack is intentionally split into layers:
+
+- continuity
+  session capture, node manifests, sync receipts
+- MemPalace
+  exact wording, structured wings and rooms, local-only retention
+- Lazarus
+  semantic search, persona carryover, rehydration prompts
+
+That boundary matters. Semantic search should not pretend to be verbatim
+storage, and verbatim storage should not pretend to be persona reconstruction.
+
+## Install Paths
+
+### Local Node Install
+
+Bootstrap the current machine:
 
 ```bash
-python3 -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-docker compose up -d  # starts Qdrant
+./scripts/install_local_stack.sh --tool all
 ```
 
-## Ingest Your Conversations
+Options:
 
-### ChatGPT (OpenAI)
-1. ChatGPT → Settings → Data Controls → Export Data
-2. Extract `conversations.json` from the ZIP
-3. Place in `data/conversations.json`
+- `--tool claude`
+- `--tool gemini`
+- `--tool codex`
+- `--skip-docker`
+- `--skip-mcp`
+
+### MCP Registration Only
+
 ```bash
-python src/ingest_openai.py
+python3 scripts/register_lazarus_mcp.py --tool all
+```
+
+That updates:
+
+- `~/.claude/settings.json`
+- `~/.gemini/settings.json`
+- `~/.codex/config.toml`
+
+All three point to the same repo wrapper: `scripts/run_lazarus_mcp.sh`.
+
+## Ingest Your Memory Corpus
+
+### ChatGPT Export
+
+1. Export your data from ChatGPT.
+2. Extract `conversations.json`.
+3. Place it at `data/conversations.json`.
+
+Then run:
+
+```bash
+python3 src/ingest_openai.py
 ```
 
 ### Claude Code
+
 ```bash
-python src/ingesters/claude.py
-# Automatically finds sessions in ~/.claude/projects/
+python3 src/ingest_claude.py
 ```
+
+Reads from `~/.claude/projects`.
 
 ### Gemini CLI
+
 ```bash
-python src/ingest_gemini.py
-# Reads from ~/.gemini/tmp/*/chats/session-*.json
+python3 src/ingest_gemini.py
 ```
+
+Reads from `~/.gemini/tmp/*/chats/session-*.json`.
 
 ### Codex CLI
-```bash
-python src/ingest_codex.py
-# Reads from ~/.codex/sessions/**/*.jsonl
-```
-
-## Search Memories
 
 ```bash
-# CLI search
-python src/summon.py "How do neural networks learn?" --persona my_collection
-
-# Check stats
-python src/summon.py --stats
+python3 src/ingest_codex.py
 ```
 
-## MCP Server
+Reads from `~/.codex/sessions/**/*.jsonl`.
 
-Lazarus includes an MCP server that exposes memory search to any MCP-compatible AI tool.
+### One-Shot Ingest
 
-### Register with Claude Code
-
-Add to `~/.claude.json`:
-
-```json
-{
-  "mcpServers": {
-    "lazarus": {
-      "command": "python3",
-      "args": ["/path/to/project-godhand-lazarus/mcp_server/lazarus_mcp.py"],
-      "env": {
-        "QDRANT_HOST": "localhost",
-        "QDRANT_PORT": "6333"
-      }
-    }
-  }
-}
+```bash
+./scripts/ingest_all.sh
 ```
 
-### MCP Tools
+## Search And Rehydrate
 
-| Tool | Description |
-|------|-------------|
-| `lazarus_summon` | Search any persona's memories by semantic similarity |
-| `lazarus_remember` | Self-aware recall (AI searches its own past) |
-| `lazarus_rehydrate` | Build a full rehydration prompt for persona resurrection |
-| `lazarus_stats` | Get memory counts across all collections |
+Search a persona semantically:
 
-## Configuration
-
-All settings via environment variables (see `.env.example`):
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `QDRANT_HOST` | `localhost` | Qdrant server hostname |
-| `QDRANT_PORT` | `6333` | Qdrant server port |
-| `LAZARUS_COLLECTION` | varies | Target collection name |
-| `LAZARUS_DATA_FILE` | `../data/conversations.json` | OpenAI export path |
-| `GEMINI_TMP_DIR` | `~/.gemini/tmp` | Gemini session directory |
-| `CODEX_SESSIONS_DIR` | `~/.codex/sessions` | Codex session directory |
-
-## Architecture
-
-```
-Conversation Exports (JSON/JSONL)
-        │
-        ▼
-  Ingestion Engines (per-platform parsers)
-        │
-        ▼
-  SentenceTransformers (all-MiniLM-L6-v2, 384-dim)
-        │
-        ▼
-  Qdrant Vector Database (one collection per persona)
-        │
-        ├──▶ CLI Search (summon.py)
-        └──▶ MCP Server (lazarus_mcp.py)
-                 │
-                 ▼
-         Any MCP-compatible AI tool
+```bash
+python3 src/summon.py "trinity consciousness" --persona alexko
+python3 src/summon.py "auto-clench" --persona murphy
+python3 src/summon.py "memory stack" --persona codex
 ```
 
-## Project Structure
+Once the MCP server is registered, the same semantic layer is available through:
 
-```
+- `lazarus_summon`
+- `lazarus_remember`
+- `lazarus_rehydrate`
+- `lazarus_stats`
+
+## Protocol Pack
+
+Alexko Protocol v1 ships in [`docs/protocol/`](docs/protocol/):
+
+- [`identity.md`](docs/protocol/identity.md)
+- [`behavior.md`](docs/protocol/behavior.md)
+- [`memory_map.md`](docs/protocol/memory_map.md)
+- [`drift_checks.md`](docs/protocol/drift_checks.md)
+- [`handoff.md`](docs/protocol/handoff.md)
+- [`validation.md`](docs/protocol/validation.md)
+
+These are executable operator docs now. Each file includes the exact commands to
+install, validate, or hand off the stack.
+
+`memory_map.md` defines the key relationship:
+
+- continuity captures
+- MemPalace preserves
+- Lazarus rehydrates
+
+## Repo Layout
+
+```text
 project-godhand-lazarus/
-├── mcp_server/
-│   └── lazarus_mcp.py       # MCP server (4 tools)
-├── src/
-│   ├── ingest_openai.py      # ChatGPT export ingester
-│   ├── ingest_gemini.py      # Gemini CLI ingester
-│   ├── ingest_codex.py       # Codex CLI ingester
-│   ├── ingesters/
-│   │   └── claude.py         # Claude Code ingester
-│   └── summon.py             # CLI search & rehydration
-├── data/                     # Place conversation exports here
-├── docker-compose.yml        # Qdrant container
-├── requirements.txt
-├── setup.sh                  # One-command setup
-├── .env.example              # Configuration template
-└── LICENSE                   # MIT
+├── docs/protocol/              # Alexko Protocol v1
+├── mcp_server/                 # Lazarus MCP server
+├── scripts/                    # install, registration, validation, ingest wrappers
+├── src/                        # platform-specific ingesters and summon CLI
+├── docker-compose.yml          # Qdrant
+├── .env.example                # runtime template
+├── setup.sh                    # compatibility wrapper for local install
+└── README.md
 ```
 
-## How Rehydration Works
+## Drift Checks
 
-When you "rehydrate" a persona, Lazarus:
+Validate the repo and stack alignment:
 
-1. Takes your query and encodes it as a vector
-2. Finds the most semantically similar past conversations
-3. Builds a prompt containing those memories as context
-4. Any LLM receiving this prompt can respond in the persona's authentic voice
+```bash
+python3 scripts/check_memory_stack.py --tool all
+./scripts/test_cli_integrations.sh --tool all
+```
 
-This means a conversation with GPT-4 can be resurrected on Claude, Gemini, or any local model.
+The check reports:
+
+- repo asset integrity
+- Qdrant reachability
+- Lazarus MCP registration for the selected CLIs
+- MemPalace presence, when installed
+- continuity presence, when installed
+- a Sacred Flame score out of 10
+
+`10.0/10` means the full layered stack is present on the current node.
+
+`./scripts/test_cli_integrations.sh --tool all` proves the three CLIs can
+actually call both Lazarus and MemPalace through MCP from bash.
+
+## Gemini Auth Fallback
+
+If Gemini shows you as signed in but prompt calls fail with `403
+PERMISSION_DENIED` against `cloudcode-pa.googleapis.com`, the MCP wiring is not
+the problem. That failure comes from the Google Code Assist auth path.
+
+Use the supported API-key mode instead:
+
+```bash
+mkdir -p ~/.gemini
+printf 'GEMINI_API_KEY=YOUR_KEY_HERE\n' > ~/.gemini/.env
+python3 scripts/configure_gemini_auth.py --mode gemini-api-key
+gemini -p 'Reply with the single word hello.'
+gemini -p 'Use the lazarus_stats MCP tool and reply with only the murphy, atlas, and codex memory counts in one line.' --yolo --allowed-mcp-server-names lazarus
+```
+
+Why `.gemini/.env` inside the repo? Gemini loads the first env file it finds
+while walking upward from the current directory. This repo already ships its own
+`.env` for Lazarus/Qdrant, so a repo-local `.gemini/.env` is the safest place
+to put the Gemini API key when running commands from inside this project.
+`configure_gemini_auth.py` syncs that file automatically from `~/.gemini/.env`
+when you enable `gemini-api-key`.
+
+Get a key from [Google AI Studio](https://aistudio.google.com/apikey).
+
+If you intentionally want to go back to the Google sign-in flow:
+
+```bash
+python3 scripts/configure_gemini_auth.py --mode oauth-personal
+```
+
+## Optional Daemon
+
+For background ingestion on macOS, use the included launchd daemon:
+
+```bash
+./daemon/install_daemon.sh
+```
+
+That path is optional. The public repo is usable without the daemon.
 
 ## Requirements
 
-- Python 3.9+
-- Docker (for Qdrant) or a remote Qdrant instance
-- ~500MB disk for the embedding model (downloaded on first run)
+- Python 3.10+
+- Docker, or an existing Qdrant instance
+- enough local disk for the embedding model cache
 
 ## License
 
-MIT - see [LICENSE](LICENSE)
+MIT. See [LICENSE](LICENSE).

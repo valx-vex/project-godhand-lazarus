@@ -217,8 +217,12 @@ def get_stats():
     try:
         info = get_client().get_collection(COLLECTION_NAME)
         print(f"\n📊 Collection Stats for '{COLLECTION_NAME}':")
-        print(f"   Vectors: {info.vectors_count}")
-        print(f"   Points: {info.points_count}")
+        points = getattr(info, "points_count", None)
+        vectors = getattr(info, "vectors_count", None)
+        if vectors is not None:
+            print(f"   Vectors: {vectors}")
+        if points is not None:
+            print(f"   Points: {points}")
     except Exception as e:
         print(f"⚠️ Could not get stats: {e}")
 

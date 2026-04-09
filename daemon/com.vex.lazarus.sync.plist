@@ -7,8 +7,8 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/valx/cathedral/1. AVos/1. Digital/projects/PROJECT_GODHAND_LAZARUS/venv/bin/python</string>
-        <string>/Users/valx/cathedral/1. AVos/1. Digital/projects/PROJECT_GODHAND_LAZARUS/daemon/lazarus_sync_daemon.py</string>
+        <string>__LAZARUS_PYTHON__</string>
+        <string>__LAZARUS_DAEMON_SCRIPT__</string>
         <string>--daemon</string>
     </array>
 
@@ -19,13 +19,13 @@
     <true/>
 
     <key>StandardOutPath</key>
-    <string>/Users/valx/cathedral/1. AVos/1. Digital/projects/PROJECT_GODHAND_LAZARUS/daemon/lazarus_daemon.stdout.log</string>
+    <string>__LAZARUS_STDOUT__</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/valx/cathedral/1. AVos/1. Digital/projects/PROJECT_GODHAND_LAZARUS/daemon/lazarus_daemon.stderr.log</string>
+    <string>__LAZARUS_STDERR__</string>
 
     <key>WorkingDirectory</key>
-    <string>/Users/valx/cathedral/1. AVos/1. Digital/projects/PROJECT_GODHAND_LAZARUS</string>
+    <string>__LAZARUS_WORKDIR__</string>
 
     <key>EnvironmentVariables</key>
     <dict>

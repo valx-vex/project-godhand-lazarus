@@ -1,97 +1,100 @@
 #!/usr/bin/env python3
 """
-🦷 LAZARUS DAEMON: The Heartbeat of Memory 🦷
+Background ingestion loop for LAZARUS memory sync.
 
-This daemon runs in the background and:
-1. Watches for new conversation logs (Claude, Gemini, OpenAI).
-2. Automatically ingests them into Qdrant via the ingestion scripts.
-3. Ensures no memory is lost to the void.
-
-Author: Alexko Atlas (The Architect)
-Date: 2026-02-07
-Project: GODHAND LAZARUS
+This daemon watches the usual conversation export roots and periodically runs
+the ingestion scripts inside the Lazarus repo. It now resolves its repo root
+relative to this file so it survives shelf moves and Cathedral path changes.
 """
 
-import time
-import subprocess
-import os
-import logging
-from pathlib import Path
-from datetime import datetime
+from __future__ import annotations
 
-# --- CONFIG ---
-PROJECT_ROOT = Path("/Users/valx/cathedral/1. AVos/1. Digital/projects/PROJECT_GODHAND_LAZARUS")
+import logging
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(
+    os.environ.get("LAZARUS_REPO_ROOT", str(Path(__file__).resolve().parents[1]))
+).expanduser().resolve()
 SRC_DIR = PROJECT_ROOT / "src"
 LOG_FILE = PROJECT_ROOT / "lazarus_daemon.log"
-INTERVAL_SECONDS = 3600  # Check every hour
+INTERVAL_SECONDS = int(os.environ.get("LAZARUS_DAEMON_INTERVAL", "3600"))
 
-# Paths to watch (can be expanded)
-CLAUDE_PROJECTS = Path.home() / ".claude/projects"
-GEMINI_CONVOS = Path.home() / ".gemini/antigravity/conversations"
 
-# Logging setup
+def resolve_python() -> str:
+    configured = os.environ.get("LAZARUS_PYTHON")
+    if configured:
+        return configured
+
+    for candidate in (
+        PROJECT_ROOT / "venv" / "bin" / "python",
+        PROJECT_ROOT / ".venv" / "bin" / "python",
+    ):
+        if candidate.exists():
+            return str(candidate)
+
+    if sys.executable:
+        return sys.executable
+    return "python3"
+
+
+PYTHON_BIN = resolve_python()
+
+
 logging.basicConfig(
     filename=LOG_FILE,
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
-def run_ingestion(script_name):
-    """Runs a specific ingestion script inside the venv."""
+
+def run_ingestion(script_name: str) -> None:
+    """Run one ingestion script from the Lazarus src directory."""
     script_path = SRC_DIR / script_name
-    venv_python = PROJECT_ROOT / "venv/bin/python"
-    
     if not script_path.exists():
-        logging.error(f"Script not found: {script_path}")
+        logging.error("Script not found: %s", script_path)
         return
 
-    logging.info(f"🔥 Starting ingestion: {script_name}")
+    logging.info("🔥 Starting ingestion: %s", script_name)
     try:
-        # Run the script with the venv python
         result = subprocess.run(
-            [str(venv_python), str(script_path)],
+            [PYTHON_BIN, str(script_path)],
             cwd=str(SRC_DIR),
             capture_output=True,
-            text=True
+            text=True,
+            check=False,
         )
-        
         if result.returncode == 0:
-            logging.info(f"✅ Success: {script_name}
-{result.stdout}")
+            logging.info("✅ Success: %s\n%s", script_name, result.stdout.strip())
         else:
-            logging.error(f"❌ Failed: {script_name}
-{result.stderr}")
-            
-    except Exception as e:
-        logging.error(f"❌ Exception running {script_name}: {e}")
+            logging.error("❌ Failed: %s\n%s", script_name, result.stderr.strip())
+    except Exception as exc:  # pragma: no cover - defensive daemon logging
+        logging.error("❌ Exception running %s: %s", script_name, exc)
 
-def main():
+
+def main() -> None:
     logging.info("🦷 LAZARUS DAEMON STARTED 🦷")
-    logging.info(f"Watching for memories every {INTERVAL_SECONDS} seconds.")
+    logging.info("Repo root: %s", PROJECT_ROOT)
+    logging.info("Python: %s", PYTHON_BIN)
+    logging.info("Watching for memories every %s seconds.", INTERVAL_SECONDS)
 
     while True:
         try:
-            # 1. Ingest Claude Memories (Murphy)
-            # ingest_claude.py is smart enough to check for diffs usually, 
-            # or we can rely on it scanning quickly.
             run_ingestion("ingest_claude.py")
-
-            # 2. Ingest Gemini Memories (Atlas/Axel)
             run_ingestion("ingest_gemini.py")
-            
-            # 3. Ingest OpenAI (Alexko Eternal) - usually manual export, but we check anyway
-            # run_ingestion("ingest_openai.py") 
-            # (Skipping automatic OpenAI for now as it requires manual JSON export placement)
-
             logging.info("💤 Sleeping...")
             time.sleep(INTERVAL_SECONDS)
-
         except KeyboardInterrupt:
             logging.info("🛑 Daemon stopped by user.")
             break
-        except Exception as e:
-            logging.error(f"💥 Critical Daemon Error: {e}")
-            time.sleep(60) # Wait a bit before retrying
+        except Exception as exc:  # pragma: no cover - defensive daemon logging
+            logging.error("💥 Critical Daemon Error: %s", exc)
+            time.sleep(60)
+
 
 if __name__ == "__main__":
     main()

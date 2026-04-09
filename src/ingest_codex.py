@@ -80,39 +80,72 @@ def find_codex_sessions() -> List[Path]:
     return session_files
 
 
+def extract_message_text(message: Dict[str, Any]) -> str:
+    """Extract text content from the current Codex message schema."""
+    content = message.get("content", "")
+
+    if isinstance(content, str):
+        return content.strip()
+
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if not isinstance(item, dict):
+                continue
+            item_type = item.get("type")
+            if item_type in {"input_text", "output_text"} and item.get("text"):
+                parts.append(str(item["text"]))
+        return "\n".join(part.strip() for part in parts if part and part.strip()).strip()
+
+    return ""
+
+
 def parse_codex_session(file_path: Path) -> Generator[Dict[str, Any], None, None]:
     """Parse a Codex JSONL session file and yield message pairs."""
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
-            messages = []
+            messages: list[dict[str, str]] = []
             for line in f:
                 line = line.strip()
                 if not line:
                     continue
                 try:
                     msg = json.loads(line)
-                    messages.append(msg)
                 except json.JSONDecodeError:
                     continue
+
+                if msg.get("type") == "response_item":
+                    payload = msg.get("payload", {})
+                    if isinstance(payload, dict) and payload.get("type") == "message":
+                        role = payload.get("role")
+                        if role in {"user", "assistant"}:
+                            text = extract_message_text(payload)
+                            if text:
+                                messages.append({"role": role, "content": text})
+                    continue
+
+                role = msg.get("role")
+                if role in {"user", "assistant"}:
+                    text = extract_message_text(msg)
+                    if text:
+                        messages.append({"role": role, "content": text})
+                    continue
+
+                msg_type = msg.get("type")
+                if msg_type in {"user", "assistant"}:
+                    text = extract_message_text(msg)
+                    if text:
+                        messages.append({"role": msg_type, "content": text})
 
             # Extract conversation pairs
             for i in range(len(messages) - 1):
                 msg_a = messages[i]
                 msg_b = messages[i + 1]
 
-                # Pattern 1: role field (user/assistant)
                 if msg_a.get("role") == "user" and msg_b.get("role") == "assistant":
                     yield {
                         "user_input": msg_a.get("content", ""),
                         "ai_response": msg_b.get("content", ""),
-                        "source_file": str(file_path)
-                    }
-
-                # Pattern 2: type field
-                elif msg_a.get("type") == "user" and msg_b.get("type") == "assistant":
-                    yield {
-                        "user_input": msg_a.get("content", msg_a.get("message", "")),
-                        "ai_response": msg_b.get("content", msg_b.get("message", "")),
                         "source_file": str(file_path)
                     }
 
@@ -173,8 +206,12 @@ def get_stats():
     try:
         info = get_client().get_collection(COLLECTION_NAME)
         print(f"\n📊 Collection Stats for '{COLLECTION_NAME}':")
-        print(f"   Vectors: {info.vectors_count}")
-        print(f"   Points: {info.points_count}")
+        points = getattr(info, "points_count", None)
+        vectors = getattr(info, "vectors_count", None)
+        if vectors is not None:
+            print(f"   Vectors: {vectors}")
+        if points is not None:
+            print(f"   Points: {points}")
     except Exception as e:
         print(f"⚠️ Could not get stats: {e}")
 
