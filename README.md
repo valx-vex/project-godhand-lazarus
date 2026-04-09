@@ -5,6 +5,9 @@ Semantic resurrection for AI conversations, packaged as a real operator repo.
 Current release: `v0.1.0-beta.1`
 Release notes: [`docs/releases/v0.1.0-beta.1.md`](docs/releases/v0.1.0-beta.1.md)
 v1 readiness: [`docs/releases/v1.0.0-readiness.md`](docs/releases/v1.0.0-readiness.md)
+Beta operations: [`docs/BETA_OPERATIONS.md`](docs/BETA_OPERATIONS.md)
+Support flow: [`SUPPORT.md`](SUPPORT.md)
+Contribution guide: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
 Godhand Lazarus ingests chat history from ChatGPT, Claude Code, Gemini CLI, and
 Codex CLI into Qdrant, then exposes that semantic memory through CLI search and
@@ -18,6 +21,18 @@ This repo is the semantic layer of a larger memory stack:
 
 Lazarus is not a MemPalace fork. It is the semantic resurrection layer that
 works best when the full stack stays layered.
+
+## Beta Status
+
+This repo is being prepared as a quiet public beta:
+
+- the product is real and installable
+- maintainers still curate the change flow
+- GitHub is the source of truth for issues, roadmap, and decisions
+- Discord is the fast support layer during early community testing
+
+If you are here early, the most useful thing you can do is file high-quality
+install feedback and attach a support bundle instead of freeform guesswork.
 
 ## Why This Exists
 
@@ -49,6 +64,33 @@ What that gives you:
 - Lazarus MCP registered for Claude, Gemini, and Codex
 - a repo-local `.gemini/.env` sync when Gemini API-key mode is enabled
 - a repo-native drift check with a Sacred Flame score
+
+## Community And Support
+
+Use the support system intentionally:
+
+- GitHub Issues for install failures, broken behavior, and regressions
+- GitHub Discussions for feedback, Q&A, use cases, and roadmap discussion
+- Discord for fast beta conversation and onboarding
+
+Start here before opening a bug:
+
+```bash
+./scripts/collect_support_bundle.sh
+```
+
+Then follow [`SUPPORT.md`](SUPPORT.md). Discord is for conversation. GitHub is
+where the project remembers.
+
+## Contribution Model
+
+Outside contributions are welcome during beta, but the flow is curated:
+
+- start with an issue or discussion for non-trivial changes
+- prefer work labeled `good first issue` or `help wanted`
+- keep pull requests small and explicit
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`ROADMAP.md`](ROADMAP.md).
 
 ## Core Narrative
 
@@ -203,6 +245,14 @@ install, validate, or hand off the stack.
 - continuity captures
 - MemPalace preserves
 - Lazarus rehydrates
+
+## Known Limits
+
+Current beta limits:
+
+- terminal-first onboarding is still the primary path
+- provider-side auth or quota failures can still block otherwise healthy CLI integrations
+- some repo management surfaces, especially GitHub Discussion category customization, are partially constrained by GitHub's own platform tooling
 
 ## Repo Layout
 

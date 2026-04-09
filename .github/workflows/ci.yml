@@ -35,3 +35,4 @@ jobs:
           python scripts/check_memory_stack.py --help >/dev/null
           python scripts/configure_gemini_auth.py --help >/dev/null
           python scripts/register_lazarus_mcp.py --help >/dev/null
+          bash scripts/collect_support_bundle.sh --help >/dev/null

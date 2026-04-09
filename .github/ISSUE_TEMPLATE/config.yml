@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Beta feedback and Q&A
+    url: https://github.com/valx-vex/project-godhand-lazarus/discussions
+    about: Use Discussions for usage questions, feedback, and roadmap conversation.
+  - name: Support guide
+    url: https://github.com/valx-vex/project-godhand-lazarus/blob/main/SUPPORT.md
+    about: Read the support flow and collect a support bundle before filing an issue.

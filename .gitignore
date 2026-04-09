@@ -18,6 +18,7 @@ Thumbs.db
 .idea/
 *.swp
 backups/
+support-bundles/
 
 # Internal development docs (not part of public release)
 ATLAS_*.md

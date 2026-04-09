@@ -1,0 +1,48 @@
+name: Install / setup issue
+description: Report a broken install, configuration path, or environment setup.
+title: "[install] "
+labels:
+  - beta
+  - install
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing Godhand Lazarus. Please attach a support bundle from `./scripts/collect_support_bundle.sh` whenever possible.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What broke?
+      description: Describe the install or setup failure in one short paragraph.
+      placeholder: The installer completed, but the MCP wrapper points to the wrong path on macOS.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, shell, Docker state, and which CLI tool you were wiring.
+      placeholder: macOS 15, zsh, Docker Desktop running, trying to wire Gemini + Codex.
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command(s) you ran
+      description: Paste the exact install or validation command.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Relevant output
+      description: Paste the error output or attach the generated support bundle.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expectation
+    attributes:
+      label: What did you expect instead?
+      description: One sentence is enough.

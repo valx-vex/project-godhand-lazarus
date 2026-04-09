@@ -1,0 +1,32 @@
+name: Feature request
+description: Propose a new capability or a meaningful improvement to an existing flow.
+title: "[idea] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe the user pain, not just the feature.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What change do you want?
+      description: Describe the behavior you want to see.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What have you tried already?
+      description: Optional, but useful if there is a workaround or adjacent tool.
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution intent
+      options:
+        - label: I would be willing to help test this.
+        - label: I would be willing to help implement this once maintainers agree on the shape.
