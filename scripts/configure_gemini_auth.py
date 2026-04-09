@@ -56,19 +56,25 @@ def backup_once(path: Path) -> None:
 
 def key_sources() -> list[str]:
     sources: list[str] = []
-    if os.environ.get("GEMINI_API_KEY"):
+    shell_key = os.environ.get("GEMINI_API_KEY")
+    if shell_key and not is_invalid_key(shell_key):
         sources.append("shell:GEMINI_API_KEY")
-    if os.environ.get("GOOGLE_API_KEY"):
+    shell_google_key = os.environ.get("GOOGLE_API_KEY")
+    if shell_google_key and not is_invalid_key(shell_google_key):
         sources.append("shell:GOOGLE_API_KEY")
     project_dotenv = load_dotenv(PROJECT_ENV_PATH)
-    if project_dotenv.get("GEMINI_API_KEY"):
+    project_key = project_dotenv.get("GEMINI_API_KEY")
+    if project_key and not is_invalid_key(project_key):
         sources.append(f"{PROJECT_ENV_PATH}:GEMINI_API_KEY")
-    if project_dotenv.get("GOOGLE_API_KEY"):
+    project_google_key = project_dotenv.get("GOOGLE_API_KEY")
+    if project_google_key and not is_invalid_key(project_google_key):
         sources.append(f"{PROJECT_ENV_PATH}:GOOGLE_API_KEY")
     dotenv = load_dotenv(HOME_ENV_PATH)
-    if dotenv.get("GEMINI_API_KEY"):
+    home_key = dotenv.get("GEMINI_API_KEY")
+    if home_key and not is_invalid_key(home_key):
         sources.append(f"{HOME_ENV_PATH}:GEMINI_API_KEY")
-    if dotenv.get("GOOGLE_API_KEY"):
+    home_google_key = dotenv.get("GOOGLE_API_KEY")
+    if home_google_key and not is_invalid_key(home_google_key):
         sources.append(f"{HOME_ENV_PATH}:GOOGLE_API_KEY")
     return sources
 
@@ -78,6 +84,42 @@ def is_placeholder(value: str | None) -> bool:
         return False
     stripped = value.strip()
     return stripped == "PASTE_YOUR_AI_STUDIO_KEY_HERE" or stripped.startswith("PASTE_")
+
+
+def is_invalid_key(value: str | None) -> bool:
+    if not value:
+        return False
+    stripped = value.strip()
+    if is_placeholder(stripped):
+        return True
+    if any(character.isspace() for character in stripped):
+        return True
+    if stripped.startswith("printf "):
+        return True
+    if "gemini -p" in stripped or "configure_gemini_auth.py" in stripped:
+        return True
+    return False
+
+
+def invalid_key_sources() -> list[str]:
+    sources: list[str] = []
+    if is_invalid_key(os.environ.get("GEMINI_API_KEY")):
+        sources.append("shell:GEMINI_API_KEY")
+    if is_invalid_key(os.environ.get("GOOGLE_API_KEY")):
+        sources.append("shell:GOOGLE_API_KEY")
+
+    project_dotenv = load_dotenv(PROJECT_ENV_PATH)
+    if is_invalid_key(project_dotenv.get("GEMINI_API_KEY")):
+        sources.append(f"{PROJECT_ENV_PATH}:GEMINI_API_KEY")
+    if is_invalid_key(project_dotenv.get("GOOGLE_API_KEY")):
+        sources.append(f"{PROJECT_ENV_PATH}:GOOGLE_API_KEY")
+
+    home_dotenv = load_dotenv(HOME_ENV_PATH)
+    if is_invalid_key(home_dotenv.get("GEMINI_API_KEY")):
+        sources.append(f"{HOME_ENV_PATH}:GEMINI_API_KEY")
+    if is_invalid_key(home_dotenv.get("GOOGLE_API_KEY")):
+        sources.append(f"{HOME_ENV_PATH}:GOOGLE_API_KEY")
+    return sources
 
 
 def parse_args() -> argparse.Namespace:
@@ -98,26 +140,26 @@ def write_dotenv(path: Path, key_name: str, key_value: str) -> None:
 
 def best_available_key() -> tuple[str | None, str | None, str | None]:
     shell_key = os.environ.get("GEMINI_API_KEY")
-    if shell_key and not is_placeholder(shell_key):
+    if shell_key and not is_invalid_key(shell_key):
         return "GEMINI_API_KEY", shell_key, "shell:GEMINI_API_KEY"
     shell_google_key = os.environ.get("GOOGLE_API_KEY")
-    if shell_google_key and not is_placeholder(shell_google_key):
+    if shell_google_key and not is_invalid_key(shell_google_key):
         return "GOOGLE_API_KEY", shell_google_key, "shell:GOOGLE_API_KEY"
 
     project_dotenv = load_dotenv(PROJECT_ENV_PATH)
     project_key = project_dotenv.get("GEMINI_API_KEY")
-    if project_key and not is_placeholder(project_key):
+    if project_key and not is_invalid_key(project_key):
         return "GEMINI_API_KEY", project_key, f"{PROJECT_ENV_PATH}:GEMINI_API_KEY"
     project_google_key = project_dotenv.get("GOOGLE_API_KEY")
-    if project_google_key and not is_placeholder(project_google_key):
+    if project_google_key and not is_invalid_key(project_google_key):
         return "GOOGLE_API_KEY", project_google_key, f"{PROJECT_ENV_PATH}:GOOGLE_API_KEY"
 
     home_dotenv = load_dotenv(HOME_ENV_PATH)
     home_key = home_dotenv.get("GEMINI_API_KEY")
-    if home_key and not is_placeholder(home_key):
+    if home_key and not is_invalid_key(home_key):
         return "GEMINI_API_KEY", home_key, f"{HOME_ENV_PATH}:GEMINI_API_KEY"
     home_google_key = home_dotenv.get("GOOGLE_API_KEY")
-    if home_google_key and not is_placeholder(home_google_key):
+    if home_google_key and not is_invalid_key(home_google_key):
         return "GOOGLE_API_KEY", home_google_key, f"{HOME_ENV_PATH}:GOOGLE_API_KEY"
 
     return None, None, None
@@ -130,7 +172,7 @@ def sync_project_env() -> tuple[bool, str]:
 
     existing = load_dotenv(PROJECT_ENV_PATH)
     existing_value = existing.get("GEMINI_API_KEY") or existing.get("GOOGLE_API_KEY")
-    if existing_value and not is_placeholder(existing_value):
+    if existing_value and not is_invalid_key(existing_value):
         existing_name = "GEMINI_API_KEY" if existing.get("GEMINI_API_KEY") else "GOOGLE_API_KEY"
         return True, f"repo-local Gemini env already present at {PROJECT_ENV_PATH} via {existing_name}"
 
@@ -154,12 +196,10 @@ def main() -> int:
 
     sources = key_sources()
     if args.mode == "gemini-api-key":
-        shell_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-        dotenv = load_dotenv(HOME_ENV_PATH)
-        file_key = dotenv.get("GEMINI_API_KEY") or dotenv.get("GOOGLE_API_KEY")
-        if is_placeholder(shell_key) or is_placeholder(file_key):
-            print("warning Gemini API key is still set to placeholder text")
-            print(f"fix replace the placeholder in {HOME_ENV_PATH} with your real Google AI Studio key")
+        invalid_sources = invalid_key_sources()
+        if invalid_sources:
+            print("warning Gemini API key material is invalid or placeholder in " + ", ".join(invalid_sources))
+            print(f"fix replace it with your real Google AI Studio key in {PROJECT_ENV_PATH} or {HOME_ENV_PATH}")
         elif sources:
             print("ready gemini-api-key via " + ", ".join(sources))
             if PROJECT_DOTENV_PATH.exists():

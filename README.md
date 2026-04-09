@@ -218,8 +218,8 @@ the problem. That failure comes from the Google Code Assist auth path.
 Use the supported API-key mode instead:
 
 ```bash
-mkdir -p ~/.gemini
-printf 'GEMINI_API_KEY=YOUR_KEY_HERE\n' > ~/.gemini/.env
+mkdir -p .gemini
+printf 'GEMINI_API_KEY=YOUR_KEY_HERE\n' > .gemini/.env
 python3 scripts/configure_gemini_auth.py --mode gemini-api-key
 gemini -p 'Reply with the single word hello.'
 gemini -p 'Use the lazarus_stats MCP tool and reply with only the murphy, atlas, and codex memory counts in one line.' --yolo --allowed-mcp-server-names lazarus
@@ -231,6 +231,9 @@ while walking upward from the current directory. This repo already ships its own
 to put the Gemini API key when running commands from inside this project.
 `configure_gemini_auth.py` syncs that file automatically from `~/.gemini/.env`
 when you enable `gemini-api-key`.
+
+If you want the key available outside this repo too, place the same value in
+`~/.gemini/.env` as a secondary copy.
 
 Get a key from [Google AI Studio](https://aistudio.google.com/apikey).
 
