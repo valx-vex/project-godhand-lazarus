@@ -118,7 +118,7 @@ fi
 source "$VENV_DIR/bin/activate"
 
 echo "==> Upgrading packaging tools"
-python -m pip install --upgrade pip setuptools wheel
+python -m pip install --upgrade 'pip<27' 'setuptools<82' wheel
 
 echo "==> Installing Lazarus requirements"
 python -m pip install -r "$PROJECT_ROOT/requirements.txt"

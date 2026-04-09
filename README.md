@@ -82,6 +82,9 @@ Options:
 - `--skip-docker`
 - `--skip-mcp`
 
+If `6333` is already occupied on a machine, set `QDRANT_PORT` and
+`QDRANT_GRPC_PORT` in `.env` before running the installer.
+
 ### MCP Registration Only
 
 ```bash
