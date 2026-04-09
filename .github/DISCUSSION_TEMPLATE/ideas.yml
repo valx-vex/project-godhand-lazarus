@@ -1,0 +1,19 @@
+title: "[idea] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use `Ideas` for roadmap and design discussion before a large feature becomes an issue or PR.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this idea solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed direction
+      description: Share the smallest useful shape, not the maximal dream version.
+    validations:
+      required: true

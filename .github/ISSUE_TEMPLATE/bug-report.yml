@@ -1,0 +1,49 @@
+name: Bug report
+description: Report a reproducible defect in ingest, validation, search, or MCP behavior.
+title: "[bug] "
+labels:
+  - beta
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for confirmed or strongly suspected defects. If this is really a usage question, please use GitHub Discussions instead.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Bug summary
+      description: What is the broken behavior?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction steps
+      description: List the smallest sequence that triggers the problem.
+      placeholder: |
+        1. Run ...
+        2. Run ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include error output and attach the support bundle when possible.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Which layer appears broken?
+      placeholder: ingest_openai, Qdrant startup, Gemini MCP, README instructions, support bundle, etc.

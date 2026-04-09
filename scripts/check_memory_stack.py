@@ -26,6 +26,20 @@ PROTOCOL_DOCS = [
     PROJECT_ROOT / "docs" / "protocol" / "handoff.md",
     PROJECT_ROOT / "docs" / "protocol" / "validation.md",
 ]
+COMMUNITY_ASSETS = [
+    PROJECT_ROOT / "CONTRIBUTING.md",
+    PROJECT_ROOT / "CODE_OF_CONDUCT.md",
+    PROJECT_ROOT / "SECURITY.md",
+    PROJECT_ROOT / "SUPPORT.md",
+    PROJECT_ROOT / "ROADMAP.md",
+    PROJECT_ROOT / "docs" / "BETA_OPERATIONS.md",
+    PROJECT_ROOT / "docs" / "MAINTAINER_PLAYBOOK.md",
+    PROJECT_ROOT / "scripts" / "collect_support_bundle.sh",
+    PROJECT_ROOT / ".github" / "ISSUE_TEMPLATE" / "config.yml",
+    PROJECT_ROOT / ".github" / "ISSUE_TEMPLATE" / "install-setup.yml",
+    PROJECT_ROOT / ".github" / "ISSUE_TEMPLATE" / "bug-report.yml",
+    PROJECT_ROOT / ".github" / "ISSUE_TEMPLATE" / "feature-request.yml",
+]
 
 
 def load_dotenv(path: Path) -> dict[str, str]:
@@ -235,11 +249,12 @@ def check_repo_assets() -> tuple[bool, str]:
         PROJECT_ROOT / "scripts" / "ingest_all.sh",
         PROJECT_ROOT / "mcp_server" / "lazarus_mcp.py",
         *PROTOCOL_DOCS,
+        *COMMUNITY_ASSETS,
     ]
     missing = [path for path in required if not path.exists()]
     if missing:
         return False, "missing assets: " + ", ".join(str(path) for path in missing)
-    return True, "runtime scripts and protocol docs are present"
+    return True, "runtime, protocol, and beta community assets are present"
 
 
 def check_mempalace() -> tuple[bool, str]:
