@@ -62,8 +62,21 @@ resolve_python() {
   exit 1
 }
 
+resolve_compose() {
+  if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+    printf 'docker compose'
+    return
+  fi
+  if command -v docker-compose >/dev/null 2>&1; then
+    printf 'docker-compose'
+    return
+  fi
+  return 1
+}
+
 PYTHON_BIN="$(resolve_python)"
 VENV_DIR="$PROJECT_ROOT/.venv"
+COMPOSE_CMD=""
 
 wait_for_qdrant() {
   local deadline=$((SECONDS + QDRANT_WAIT_SECONDS))
@@ -127,12 +140,12 @@ if [[ -f "$PROJECT_ROOT/.env" ]]; then
 fi
 
 if [[ "$SKIP_DOCKER" -eq 0 ]]; then
-  if command -v docker >/dev/null 2>&1; then
+  if COMPOSE_CMD="$(resolve_compose)"; then
     echo "==> Ensuring Qdrant is running"
-    docker compose -f "$PROJECT_ROOT/docker-compose.yml" up -d qdrant
+    $COMPOSE_CMD -f "$PROJECT_ROOT/docker-compose.yml" up -d qdrant
     wait_for_qdrant
   else
-    echo "==> Docker not found, skipping Qdrant bootstrap"
+    echo "==> Docker compose not found, skipping Qdrant bootstrap"
   fi
 fi
 

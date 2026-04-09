@@ -44,7 +44,7 @@ What that gives you:
 
 - a local `.venv`
 - Lazarus dependencies installed
-- Qdrant started through Docker when available
+- Qdrant started through `docker compose` or `docker-compose` when available
 - an explicit wait for Qdrant readiness before the install exits
 - Lazarus MCP registered for Claude, Gemini, and Codex
 - a repo-local `.gemini/.env` sync when Gemini API-key mode is enabled
