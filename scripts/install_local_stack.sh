@@ -6,6 +6,9 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TOOL="all"
 SKIP_DOCKER=0
 SKIP_MCP=0
+QDRANT_HOST="localhost"
+QDRANT_PORT="6333"
+QDRANT_WAIT_SECONDS="${QDRANT_WAIT_SECONDS:-30}"
 
 usage() {
   cat <<'EOF'
@@ -62,6 +65,33 @@ resolve_python() {
 PYTHON_BIN="$(resolve_python)"
 VENV_DIR="$PROJECT_ROOT/.venv"
 
+wait_for_qdrant() {
+  local deadline=$((SECONDS + QDRANT_WAIT_SECONDS))
+
+  while (( SECONDS < deadline )); do
+    if python - "$QDRANT_HOST" "$QDRANT_PORT" >/dev/null 2>&1 <<'PY'
+import json
+import sys
+import urllib.request
+
+host = sys.argv[1]
+port = sys.argv[2]
+with urllib.request.urlopen(f"http://{host}:{port}/collections", timeout=2) as response:
+    payload = json.loads(response.read().decode("utf-8"))
+if "result" not in payload:
+    raise SystemExit(1)
+PY
+    then
+      echo "==> Qdrant reachable at http://$QDRANT_HOST:$QDRANT_PORT"
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "==> Qdrant did not become ready within ${QDRANT_WAIT_SECONDS}s at http://$QDRANT_HOST:$QDRANT_PORT" >&2
+  return 1
+}
+
 echo "==> Godhand Lazarus local install"
 echo "    repo:   $PROJECT_ROOT"
 echo "    python: $PYTHON_BIN"
@@ -87,10 +117,20 @@ if [[ ! -f "$PROJECT_ROOT/.env" && -f "$PROJECT_ROOT/.env.example" ]]; then
   cp "$PROJECT_ROOT/.env.example" "$PROJECT_ROOT/.env"
 fi
 
+if [[ -f "$PROJECT_ROOT/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$PROJECT_ROOT/.env"
+  set +a
+  QDRANT_HOST="${QDRANT_HOST:-localhost}"
+  QDRANT_PORT="${QDRANT_PORT:-6333}"
+fi
+
 if [[ "$SKIP_DOCKER" -eq 0 ]]; then
   if command -v docker >/dev/null 2>&1; then
     echo "==> Ensuring Qdrant is running"
     docker compose -f "$PROJECT_ROOT/docker-compose.yml" up -d qdrant
+    wait_for_qdrant
   else
     echo "==> Docker not found, skipping Qdrant bootstrap"
   fi

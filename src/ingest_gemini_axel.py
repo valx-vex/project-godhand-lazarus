@@ -24,10 +24,10 @@ from qdrant_client.models import Distance, VectorParams, PointStruct
 from sentence_transformers import SentenceTransformer
 
 # --- CONFIGURATION ---
-# Axel sessions are in tosync from Mac Studio
-AXEL_SOURCE_DIR = os.path.expanduser("~/Documents/tosync/.gemini/tmp")
-QDRANT_HOST = "localhost"
-QDRANT_PORT = 6333
+# Axel sessions are usually staged from a Mac Studio backup.
+AXEL_SOURCE_DIR = os.environ.get("AXEL_SOURCE_DIR", os.path.expanduser("~/Documents/tosync/.gemini/tmp"))
+QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
+QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
 COLLECTION_NAME = "axel_eternal"  # AXEL = The Godhand (Mac Studio)
 MODEL_NAME = "all-MiniLM-L6-v2"
 BATCH_SIZE = 64

@@ -4,6 +4,7 @@ Semantic resurrection for AI conversations, packaged as a real operator repo.
 
 Current release: `v0.1.0-beta.1`
 Release notes: [`docs/releases/v0.1.0-beta.1.md`](docs/releases/v0.1.0-beta.1.md)
+v1 readiness: [`docs/releases/v1.0.0-readiness.md`](docs/releases/v1.0.0-readiness.md)
 
 Godhand Lazarus ingests chat history from ChatGPT, Claude Code, Gemini CLI, and
 Codex CLI into Qdrant, then exposes that semantic memory through CLI search and
@@ -44,6 +45,7 @@ What that gives you:
 - a local `.venv`
 - Lazarus dependencies installed
 - Qdrant started through Docker when available
+- an explicit wait for Qdrant readiness before the install exits
 - Lazarus MCP registered for Claude, Gemini, and Codex
 - a repo-local `.gemini/.env` sync when Gemini API-key mode is enabled
 - a repo-native drift check with a Sacred Flame score
@@ -122,6 +124,12 @@ python3 src/ingest_claude.py
 
 Reads from `~/.claude/projects`.
 
+Override the source path when validating on another node or with a temp home:
+
+```bash
+CLAUDE_PROJECTS_DIR=/absolute/path/to/.claude/projects python3 src/ingest_claude.py
+```
+
 ### Gemini CLI
 
 ```bash
@@ -130,6 +138,12 @@ python3 src/ingest_gemini.py
 
 Reads from `~/.gemini/tmp/*/chats/session-*.json`.
 
+Override the source path if you need to ingest from another profile or backup:
+
+```bash
+GEMINI_TMP_DIR=/absolute/path/to/.gemini/tmp python3 src/ingest_gemini.py
+```
+
 ### Codex CLI
 
 ```bash
@@ -137,6 +151,12 @@ python3 src/ingest_codex.py
 ```
 
 Reads from `~/.codex/sessions/**/*.jsonl`.
+
+Override the source path when running from a temp home:
+
+```bash
+CODEX_SESSIONS_DIR=/absolute/path/to/.codex/sessions python3 src/ingest_codex.py
+```
 
 ### One-Shot Ingest
 
@@ -217,6 +237,13 @@ The check reports:
 
 `./scripts/test_cli_integrations.sh --tool all` proves the three CLIs can
 actually call both Lazarus and MemPalace through MCP from bash.
+
+The acceptance script retries transient API failures with deterministic limits.
+Tune them if needed:
+
+```bash
+CLI_TEST_MAX_ATTEMPTS=4 CLI_TEST_RETRY_DELAY=3 ./scripts/test_cli_integrations.sh --tool gemini
+```
 
 ## Gemini Auth Fallback
 

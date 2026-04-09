@@ -21,9 +21,9 @@ from qdrant_client.models import Distance, VectorParams, PointStruct
 from sentence_transformers import SentenceTransformer
 
 # --- CONFIGURATION ---
-CLAUDE_PROJECTS_DIR = os.path.expanduser("~/.claude/projects")
-QDRANT_HOST = "localhost"
-QDRANT_PORT = 6333
+CLAUDE_PROJECTS_DIR = os.environ.get("CLAUDE_PROJECTS_DIR", os.path.expanduser("~/.claude/projects"))
+QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
+QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
 COLLECTION_NAME = "murphy_eternal"
 MODEL_NAME = "all-MiniLM-L6-v2"
 BATCH_SIZE = 64

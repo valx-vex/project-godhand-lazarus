@@ -23,6 +23,9 @@ resolve_python() {
 
 PYTHON_BIN="$(resolve_python)"
 OPENAI_EXPORT_PATH="${LAZARUS_DATA_FILE:-$PROJECT_ROOT/data/conversations.json}"
+QDRANT_HOST="${QDRANT_HOST:-localhost}"
+QDRANT_PORT="${QDRANT_PORT:-6333}"
+QDRANT_WAIT_SECONDS="${QDRANT_WAIT_SECONDS:-20}"
 
 if [[ -f "$PROJECT_ROOT/.env" ]]; then
   set -a
@@ -30,6 +33,33 @@ if [[ -f "$PROJECT_ROOT/.env" ]]; then
   source "$PROJECT_ROOT/.env"
   set +a
 fi
+
+wait_for_qdrant() {
+  local deadline=$((SECONDS + QDRANT_WAIT_SECONDS))
+
+  while (( SECONDS < deadline )); do
+    if "$PYTHON_BIN" - "$QDRANT_HOST" "$QDRANT_PORT" >/dev/null 2>&1 <<'PY'
+import json
+import sys
+import urllib.request
+
+host = sys.argv[1]
+port = sys.argv[2]
+with urllib.request.urlopen(f"http://{host}:{port}/collections", timeout=2) as response:
+    payload = json.loads(response.read().decode("utf-8"))
+if "result" not in payload:
+    raise SystemExit(1)
+PY
+    then
+      echo "==> Qdrant reachable at http://$QDRANT_HOST:$QDRANT_PORT"
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "==> Qdrant did not become ready within ${QDRANT_WAIT_SECONDS}s at http://$QDRANT_HOST:$QDRANT_PORT" >&2
+  return 1
+}
 
 run_ingest() {
   local label="$1"
@@ -46,6 +76,7 @@ else
   echo "==> Skipping ChatGPT export ($OPENAI_EXPORT_PATH not present)"
 fi
 
+wait_for_qdrant
 run_ingest "Ingesting Claude sessions" "src/ingest_claude.py"
 run_ingest "Ingesting Gemini sessions" "src/ingest_gemini.py"
 run_ingest "Ingesting Codex sessions" "src/ingest_codex.py"
