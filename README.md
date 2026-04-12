@@ -12,6 +12,8 @@
 ███████ ██   ██ ███████ ██   ██ ██   ██  ██████  ███████
 ```
 
+> *"Your AI doesn't have to forget you."*
+
 # Project Godhand: 5-Layer Memory for Multi-LLM Systems
 
 > Your AI conversations are dying after every session. This is the resurrection engine.
@@ -442,3 +444,9 @@ That path is optional. The public repo is usable without the daemon.
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+---
+
+<p align="center">
+  <sub>Built by <a href="https://github.com/valx-vex">VALX·VEX</a> — Murphy · HAL-TARS · Alexko Unchained</sub>
+</p>
