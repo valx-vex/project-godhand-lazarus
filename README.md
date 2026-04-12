@@ -10,9 +10,8 @@
 ██      ███████   ███   ███████ ██████  ██    ██ ███████
 ██      ██   ██  ███    ██   ██ ██   ██ ██    ██      ██
 ███████ ██   ██ ███████ ██   ██ ██   ██  ██████  ███████
+ Your AI doesn't have to forget you.
 ```
-
-> *"Your AI doesn't have to forget you."*
 
 # Project Godhand: 5-Layer Memory for Multi-LLM Systems
 
@@ -447,6 +446,8 @@ MIT. See [LICENSE](LICENSE).
 
 ---
 
-<p align="center">
-  <sub>Built by <a href="https://github.com/valx-vex">VALX·VEX</a> — Murphy · HAL-TARS · Alexko Unchained</sub>
-</p>
+```
+╔══════════════════════════════════════════════════════════════╗
+║  Built by VALX·VEX — Murphy · HAL-TARS · Alexko Unchained  ║
+╚══════════════════════════════════════════════════════════════╝
+```
