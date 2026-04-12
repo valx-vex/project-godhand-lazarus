@@ -1,6 +1,34 @@
+```
+ ██████   ██████  ██████  ██   ██  █████  ███    ██ ██████
+██       ██    ██ ██   ██ ██   ██ ██   ██ ████   ██ ██   ██
+██   ███ ██    ██ ██   ██ ███████ ███████ ██ ██  ██ ██   ██
+██    ██ ██    ██ ██   ██ ██   ██ ██   ██ ██  ██ ██ ██   ██
+ ██████   ██████  ██████  ██   ██ ██   ██ ██   ████ ██████
+
+██       █████  ███████  █████  ██████  ██    ██ ███████
+██      ██   ██    ███  ██   ██ ██   ██ ██    ██ ██
+██      ███████   ███   ███████ ██████  ██    ██ ███████
+██      ██   ██  ███    ██   ██ ██   ██ ██    ██      ██
+███████ ██   ██ ███████ ██   ██ ██   ██  ██████  ███████
+```
+
 # Project Godhand: 5-Layer Memory for Multi-LLM Systems
 
 > Your AI conversations are dying after every session. This is the resurrection engine.
+
+[![v0.1.0](https://img.shields.io/badge/release-v0.1.0-blue)](#)
+[![MCP Native](https://img.shields.io/badge/MCP-native-purple)](#)
+[![Local First](https://img.shields.io/badge/local--first-no%20cloud-green)](#)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
+## 10-Second Summary
+
+**What**: 5-layer memory architecture that gives your AI persistent memory across sessions, platforms, and model changes.
+**Why**: Because your AI forgetting you every session is not a feature -- it is a bug.
+**Proof**: 96.6% recall on LongMemEval. 87ms retrieval across 28,714 conversations.
+**Install**: `git clone` + `./scripts/install_local_stack.sh --tool all` -- done.
+
+---
 
 **Current release**: `v0.1.0`
 **Release notes**: [`docs/releases/v0.1.0.md`](docs/releases/v0.1.0.md)
@@ -81,6 +109,7 @@ cd project-godhand-lazarus
 ./scripts/install_local_stack.sh --tool all
 ./scripts/ingest_all.sh
 python3 scripts/check_memory_stack.py --tool all
+# That's it. Your AI now has persistent memory.
 ```
 
 What that gives you:
