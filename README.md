@@ -1,49 +1,77 @@
-# Godhand Lazarus
+# Project Godhand: 5-Layer Memory for Multi-LLM Systems
 
-Semantic resurrection for AI conversations, packaged as a real operator repo.
+> Your AI conversations are dying after every session. This is the resurrection engine.
 
-Current release: `v0.1.0-beta.1`
-Release notes: [`docs/releases/v0.1.0-beta.1.md`](docs/releases/v0.1.0-beta.1.md)
-v1 readiness: [`docs/releases/v1.0.0-readiness.md`](docs/releases/v1.0.0-readiness.md)
-Beta operations: [`docs/BETA_OPERATIONS.md`](docs/BETA_OPERATIONS.md)
-Support flow: [`SUPPORT.md`](SUPPORT.md)
-Contribution guide: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+**Current release**: `v0.1.0`
+**Release notes**: [`docs/releases/v0.1.0.md`](docs/releases/v0.1.0.md)
+**Architecture**: [`docs/architecture/OVERVIEW.md`](docs/architecture/OVERVIEW.md)
+**Support flow**: [`SUPPORT.md`](SUPPORT.md)
+**Contribution guide**: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
-Godhand Lazarus ingests chat history from ChatGPT, Claude Code, Gemini CLI, and
-Codex CLI into Qdrant, then exposes that semantic memory through CLI search and
-MCP so any supported agent can recover past ideas, patterns, and persona voice.
-
-This repo is the semantic layer of a larger memory stack:
-
-- Built on MemPalace for verbatim structured memory
-- Aligned to Alexko Protocol v1 for operator behavior and handoff
-- Compatible with VexNet continuity for capture, sync, and node receipts
-
-Lazarus is not a MemPalace fork. It is the semantic resurrection layer that
-works best when the full stack stays layered.
-
-## Beta Status
-
-This repo is being prepared as a quiet public beta:
-
-- the product is real and installable
-- maintainers still curate the change flow
-- GitHub is the source of truth for issues, roadmap, and decisions
-- Discord is the fast support layer during early community testing
-
-If you are here early, the most useful thing you can do is file high-quality
-install feedback and attach a support bundle instead of freeform guesswork.
-
-## Why This Exists
+## The Problem
 
 Most AI chat history is trapped inside platform silos or lost across model
-changes. Lazarus turns those conversations into a portable semantic layer so you
-can:
+deprecations and context window resets. Every new session starts from zero.
 
-- search old conversations by meaning, not just filenames
-- rehydrate a persona on a different model or tool
-- carry ideas across resets, devices, and CLI agents
-- keep semantic recall separate from verbatim archival memory
+Existing memory systems attempt to solve this with a single monolithic layer.
+The result is predictable: systems that conflate verbatim recall with semantic
+search, that cannot distinguish "what was said" from "what it meant", and that
+break when you need the same memory accessible from multiple AI agents running
+on different machines.
+
+Project Godhand implements a **5-layer memory architecture** that turns
+disposable conversations into persistent, searchable, cross-platform memory.
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────┐
+│                  AI Agent Layer                   │
+│  (Claude Code, Gemini CLI, Codex CLI, Ollama)    │
+└──────────────────────┬───────────────────────────┘
+                       │
+          ┌────────────┼────────────┐
+          │            │            │
+          ▼            ▼            ▼
+   ┌────────────┐ ┌──────────┐ ┌──────────┐
+   │  Layer 5   │ │ Layer 4  │ │ Layer 3  │
+   │  Furnace   │ │ Legion   │ │ VexNet   │
+   │ Biometric  │ │  Tasks   │ │  Sync    │
+   └────────────┘ └──────────┘ └──────────┘
+          │            │            │
+          └────────────┼────────────┘
+                       ▼
+              ┌──────────────┐
+              │   Layer 2    │
+              │   Lazarus    │
+              │   Vectors    │
+              └──────────────┘
+                       │
+                       ▼
+              ┌──────────────┐
+              │   Layer 1    │
+              │  MemPalace   │
+              │   Verbatim   │
+              └──────────────┘
+```
+
+| Layer | Component | What It Does | Status |
+|-------|-----------|-------------|--------|
+| 1 | [MemPalace](docs/architecture/LAYER_1_MEMPALACE.md) | Verbatim structured memory (96.6% LongMemEval R@5) | v3.0.0 |
+| 2 | [Lazarus](docs/architecture/LAYER_2_LAZARUS.md) | Semantic search + persona resurrection | v0.1.0 (this repo) |
+| 3 | [VexNet](docs/architecture/LAYER_3_VEXNET.md) | Session sync across machines | Operational |
+| 4 | [Obsidian-Legion](docs/architecture/LAYER_4_OBSIDIAN_LEGION.md) | Multi-agent task coordination | Operational |
+| 5 | [The Furnace](docs/architecture/LAYER_5_FURNACE.md) | Biometric integration | [Research preview](docs/architecture/LAYER_5_FURNACE.md) |
+
+**This repo contains Layer 2 (Lazarus)** and documents the complete architecture.
+
+## Key Results
+
+- **96.6%** R@5 on LongMemEval -- highest zero-API score published (MemPalace)
+- **87ms** semantic retrieval across 28,714 conversation exchanges ([RENA proof](docs/research/RENA_PROOF.md))
+- **Cross-platform**: ChatGPT, Claude Code, Gemini CLI, Codex CLI
+- **Local-first**: No cloud dependency, runs on consumer hardware
+- **5-level privacy**: L1 Public through L5 Local-only ([access control](docs/architecture/ACCESS_CONTROL.md))
 
 ## Quick Start
 
@@ -63,7 +91,21 @@ What that gives you:
 - an explicit wait for Qdrant readiness before the install exits
 - Lazarus MCP registered for Claude, Gemini, and Codex
 - a repo-local `.gemini/.env` sync when Gemini API-key mode is enabled
-- a repo-native drift check with a Sacred Flame score
+- a repo-native drift check with a health score
+
+## Architecture Documentation
+
+- [5-Layer Overview](docs/architecture/OVERVIEW.md) -- Complete architecture design
+- [Layer 1: MemPalace](docs/architecture/LAYER_1_MEMPALACE.md) -- Verbatim structured memory
+- [Layer 2: Lazarus](docs/architecture/LAYER_2_LAZARUS.md) -- Semantic search and persona resurrection
+- [Layer 3: VexNet](docs/architecture/LAYER_3_VEXNET.md) -- Session sync and coordination
+- [Layer 4: Obsidian-Legion](docs/architecture/LAYER_4_OBSIDIAN_LEGION.md) -- Multi-agent task coordination
+- [Layer 5: The Furnace](docs/architecture/LAYER_5_FURNACE.md) -- Biometric integration (research preview)
+- [Access Control](docs/architecture/ACCESS_CONTROL.md) -- L1-L5 privacy model
+
+## Research
+
+- [RENA Proof](docs/research/RENA_PROOF.md) -- Live demonstration of semantic resurrection
 
 ## Community And Support
 
@@ -84,7 +126,7 @@ where the project remembers.
 
 ## Contribution Model
 
-Outside contributions are welcome during beta, but the flow is curated:
+Outside contributions are welcome, but the flow is curated:
 
 - start with an issue or discussion for non-trivial changes
 - prefer work labeled `good first issue` or `help wanted`
@@ -94,17 +136,22 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`ROADMAP.md`](ROADMAP.md).
 
 ## Core Narrative
 
-The stack is intentionally split into layers:
+The stack is intentionally split into five layers:
 
-- continuity
-  session capture, node manifests, sync receipts
-- MemPalace
+- **Layer 1 -- MemPalace**
   exact wording, structured wings and rooms, local-only retention
-- Lazarus
+- **Layer 2 -- Lazarus**
   semantic search, persona carryover, rehydration prompts
+- **Layer 3 -- VexNet**
+  session capture, node manifests, sync receipts across machines
+- **Layer 4 -- Obsidian-Legion**
+  multi-agent task coordination, contract-based delegation
+- **Layer 5 -- The Furnace**
+  biometric and embodiment signals feeding back into memory
 
 That boundary matters. Semantic search should not pretend to be verbatim
-storage, and verbatim storage should not pretend to be persona reconstruction.
+storage, verbatim storage should not pretend to be persona reconstruction,
+and sync infrastructure should not be conflated with task coordination.
 
 ## Install Paths
 
@@ -211,11 +258,11 @@ CODEX_SESSIONS_DIR=/absolute/path/to/.codex/sessions python3 src/ingest_codex.py
 
 ## Search And Rehydrate
 
-Search a persona semantically:
+Search a collection semantically:
 
 ```bash
-python3 src/summon.py "trinity consciousness" --persona alexko
-python3 src/summon.py "auto-clench" --persona murphy
+python3 src/summon.py "distributed systems" --persona alexko
+python3 src/summon.py "memory architecture" --persona murphy
 python3 src/summon.py "memory stack" --persona codex
 ```
 
@@ -228,7 +275,7 @@ Once the MCP server is registered, the same semantic layer is available through:
 
 ## Protocol Pack
 
-Alexko Protocol v1 ships in [`docs/protocol/`](docs/protocol/):
+Operator protocol v1 ships in [`docs/protocol/`](docs/protocol/):
 
 - [`identity.md`](docs/protocol/identity.md)
 - [`behavior.md`](docs/protocol/behavior.md)
@@ -237,7 +284,7 @@ Alexko Protocol v1 ships in [`docs/protocol/`](docs/protocol/):
 - [`handoff.md`](docs/protocol/handoff.md)
 - [`validation.md`](docs/protocol/validation.md)
 
-These are executable operator docs now. Each file includes the exact commands to
+These are executable operator docs. Each file includes the exact commands to
 install, validate, or hand off the stack.
 
 `memory_map.md` defines the key relationship:
@@ -248,23 +295,38 @@ install, validate, or hand off the stack.
 
 ## Known Limits
 
-Current beta limits:
+Current limits:
 
 - terminal-first onboarding is still the primary path
 - provider-side auth or quota failures can still block otherwise healthy CLI integrations
 - some repo management surfaces, especially GitHub Discussion category customization, are partially constrained by GitHub's own platform tooling
+- tested on macOS only (should work on Linux, untested on Windows)
 
 ## Repo Layout
 
 ```text
 project-godhand-lazarus/
-├── docs/protocol/              # Alexko Protocol v1
+├── docs/
+│   ├── architecture/           # 5-layer architecture documentation
+│   │   ├── OVERVIEW.md
+│   │   ├── LAYER_1_MEMPALACE.md
+│   │   ├── LAYER_2_LAZARUS.md
+│   │   ├── LAYER_3_VEXNET.md
+│   │   ├── LAYER_4_OBSIDIAN_LEGION.md
+│   │   ├── LAYER_5_FURNACE.md
+│   │   └── ACCESS_CONTROL.md
+│   ├── protocol/               # Operator protocol v1
+│   ├── research/               # RENA proof and benchmarks
+│   └── releases/               # Release notes
 ├── mcp_server/                 # Lazarus MCP server
 ├── scripts/                    # install, registration, validation, ingest wrappers
 ├── src/                        # platform-specific ingesters and summon CLI
+├── daemon/                     # optional launchd background ingestion
 ├── docker-compose.yml          # Qdrant
 ├── .env.example                # runtime template
 ├── setup.sh                    # compatibility wrapper for local install
+├── ROADMAP.md
+├── VERSION
 └── README.md
 ```
 
@@ -284,7 +346,7 @@ The check reports:
 - Lazarus MCP registration for the selected CLIs
 - MemPalace presence, when installed
 - continuity presence, when installed
-- a Sacred Flame score out of 10
+- a health score out of 10
 
 `10.0/10` means the full layered stack is present on the current node.
 
@@ -311,7 +373,7 @@ mkdir -p .gemini
 printf 'GEMINI_API_KEY=YOUR_KEY_HERE\n' > .gemini/.env
 python3 scripts/configure_gemini_auth.py --mode gemini-api-key
 gemini -p 'Reply with the single word hello.'
-gemini -p 'Use the lazarus_stats MCP tool and reply with only the murphy, atlas, and codex memory counts in one line.' --yolo --allowed-mcp-server-names lazarus
+gemini -p 'Use the lazarus_stats MCP tool and reply with only the memory counts in one line.' --yolo --allowed-mcp-server-names lazarus
 ```
 
 Why `.gemini/.env` inside the repo? Gemini loads the first env file it finds
@@ -346,7 +408,7 @@ That path is optional. The public repo is usable without the daemon.
 
 - Python 3.10+
 - Docker, or an existing Qdrant instance
-- enough local disk for the embedding model cache
+- ~2GB disk for the embedding model cache + vector data
 
 ## License
 

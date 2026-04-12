@@ -1,30 +1,38 @@
 # Roadmap
 
-## Current Phase
+## Current: v0.1.0
 
-`v0.1.0-beta.1` is the quiet-beta foundation:
+First public showcase of the 5-layer memory architecture:
 
-- local install and ingest are real
-- semantic resurrection works across supported CLI memory sources
-- MemPalace and continuity integration are validated
-- community/support scaffolding is being formalized
+- **Layer 2 (Lazarus)**: Fully installable with MCP server, 5 ingesters, daemon, drift checks
+- **Layer 1 (MemPalace)**: Published as `pip install mempalace` (v3.0.0)
+- **Layers 3-5**: Architecture documented, protocols specified
 
-## Near-Term
+## Near-Term: v0.2.0
 
-- tighten onboarding and support-bundle quality
-- absorb first beta install reports
-- keep importer behavior deterministic across nodes
-- keep the clean public-history branch aligned with the shipping surface
+- Expanded ingester coverage (Slack, Discord, email archives)
+- MemPalace to Lazarus cross-query API
+- Automated extraction pipeline (reduce manual curation)
+- Second-machine install validation matrix
 
-## Toward v1.0.0
+## Medium-Term: v0.3.0
 
-- repeatable second-machine validation
-- stronger docs for first-time terminal users
-- stable beta support loop across Issues, Discussions, and Discord
-- enough outside confirmation that the product works beyond the maintainer stack
+- Obsidian-Legion public release (standalone repo)
+- VexNet reference implementation (installable protocol)
+- Combined benchmark suite across all layers
+- First academic paper submission (systems paper)
 
-## Explicit Non-Goals For Phase 0
+## Long-Term: v1.0.0
 
-- wide marketing push
-- generalized non-technical onboarding
-- premature expansion beyond the memory stack core
+- Furnace prototype with mock biometric signals
+- Full 5-layer integration test suite
+- Production-grade access control enforcement (runtime ACL)
+- Multi-platform installer (macOS, Linux, Windows)
+- Clean git history cut (squashed public history)
+
+## Explicit Non-Goals
+
+- Cloud-hosted memory service (local-first is a feature, not a limitation)
+- SaaS or subscription model
+- General-purpose chatbot framework
+- Replacing platform-native memory features

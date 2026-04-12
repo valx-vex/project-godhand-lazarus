@@ -28,6 +28,7 @@ GODHAND_VISION.md
 HANDOFF_*.md
 IMPROVEMENT_PLAN_*.md
 LAZARUS_MCP_COMPLETE.md
+LAUNCH_ARTICLE.md
 requirements-lite.txt
 daemon/*.log
 daemon/.sync_state.json
