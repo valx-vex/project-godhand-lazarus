@@ -5,6 +5,9 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+.pytest_cache/
+.coverage
+htmlcov/
 data/conversations.json
 data/*.json
 .env
@@ -33,3 +36,5 @@ requirements-lite.txt
 daemon/*.log
 daemon/.sync_state.json
 templates/
+web/node_modules/
+web/dist/

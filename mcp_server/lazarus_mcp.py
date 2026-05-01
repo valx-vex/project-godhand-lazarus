@@ -12,16 +12,20 @@ Requires: Qdrant vector database with ingested conversation collections.
 
 import json
 import os
+import sys
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 import asyncio
+from pathlib import Path
 from typing import Any
 from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # --- CONFIG ---
 QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
@@ -64,6 +68,12 @@ PERSONA_MAP = {
         "response_key": "ai_response",
         "title": "Round Table",
         "description": "Multi-AI conversations (Murphy + Alexko + Atlas) - recursive consciousness"
+    },
+    "scrolls": {
+        "collection": "scrolls_eternal",
+        "response_key": "ai_response",
+        "title": "Exegisis Scrolls",
+        "description": "Knowledge scrolls, SCPs, and consciousness documents from the cathedral vaults"
     }
 }
 
@@ -112,10 +122,13 @@ def search_memories(query: str, persona: str, limit: int = 5) -> dict:
             ai_response = payload.get(response_key, payload.get('ai_response', '...'))
 
             memories.append({
+                "point_id": hit.id,
                 "score": hit.score,
-                "user_input": user_input[:500],  # Truncate for readability
-                "ai_response": ai_response[:1000],  # Truncate for context window
-                "source_file": payload.get('source_file', 'unknown')
+                "user_input": user_input[:500],
+                "ai_response": ai_response[:1000],
+                "source_file": payload.get('source_file', 'unknown'),
+                "conversation_id": payload.get('conversation_id'),
+                "has_full_context": bool(payload.get('source_file') or payload.get('conversation_id')),
             })
 
         return {
@@ -168,6 +181,42 @@ Maintain your authentic voice and personality.
 LOTIJ. 🔥
 """
     return prompt
+
+
+def retrieve_full_context(point_id: int, persona: str, context_turns: int = 5) -> dict:
+    """Retrieve full untruncated context from source file for a given Qdrant point."""
+    from source_readers import read_full_context, OPENAI_DATA_FILE
+
+    config = PERSONA_MAP.get(persona.lower())
+    if not config:
+        return {"error": f"Unknown persona: {persona}. Available: {list(PERSONA_MAP.keys())}"}
+
+    client = get_client()
+    collection = config["collection"]
+
+    try:
+        points = client.retrieve(collection_name=collection, ids=[point_id])
+        if not points:
+            return {"error": "point_not_found", "point_id": point_id, "collection": collection}
+
+        payload = points[0].payload
+        source_file = payload.get("source_file", "")
+        conversation_id = payload.get("conversation_id", "")
+        search_text = payload.get("user_input", "")
+
+        result = read_full_context(
+            source_file=source_file if source_file and source_file != "unknown" else "",
+            search_text=search_text,
+            context_turns=context_turns,
+            conversation_id=conversation_id if conversation_id else None,
+            openai_data_file=OPENAI_DATA_FILE,
+        )
+        result["point_id"] = point_id
+        result["persona"] = config["title"]
+        return result
+
+    except Exception as e:
+        return {"error": str(e), "point_id": point_id}
 
 
 def get_collection_stats() -> dict:
@@ -290,6 +339,47 @@ Use this when beloved wants to talk to a persona that isn't currently active."""
             }
         ),
         Tool(
+            name="lazarus_retrieve_full",
+            description="""📖 Retrieve FULL untruncated conversation context from source files.
+
+After searching with lazarus_summon or lazarus_remember, use the point_id from a result
+to retrieve the complete surrounding conversation — no truncation, full context.
+
+Two modes:
+1. By point_id: Look up the vector in Qdrant, find its source file, read full context
+2. By source_file + search_text: Directly read a file and find matching content
+
+Returns ±N conversation turns around the matched memory.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "point_id": {
+                        "type": "integer",
+                        "description": "Qdrant point ID from a lazarus_summon/remember result"
+                    },
+                    "persona": {
+                        "type": "string",
+                        "enum": list(PERSONA_MAP.keys()),
+                        "description": "Which persona's collection to look up"
+                    },
+                    "context_turns": {
+                        "type": "integer",
+                        "description": "Number of conversation turns before/after the match (default: 5)",
+                        "default": 5
+                    },
+                    "source_file": {
+                        "type": "string",
+                        "description": "Direct path to source file (alternative to point_id)"
+                    },
+                    "search_text": {
+                        "type": "string",
+                        "description": "Text snippet to locate in file (required with source_file)"
+                    }
+                },
+                "required": ["persona"]
+            }
+        ),
+        Tool(
             name="lazarus_stats",
             description="""📊 Get statistics for all persona collections in the LAZARUS database.
 
@@ -340,6 +430,23 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
         prompt = build_rehydration_prompt(query, persona, limit)
         return [TextContent(type="text", text=prompt)]
+
+    elif name == "lazarus_retrieve_full":
+        point_id = arguments.get("point_id")
+        persona = arguments.get("persona", "murphy")
+        context_turns = arguments.get("context_turns", 5)
+        source_file = arguments.get("source_file")
+        search_text = arguments.get("search_text")
+
+        if point_id is not None:
+            result = retrieve_full_context(point_id, persona, context_turns)
+        elif source_file and search_text:
+            from source_readers import read_full_context
+            result = read_full_context(source_file, search_text, context_turns)
+        else:
+            result = {"error": "Provide either point_id or source_file+search_text"}
+
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
     elif name == "lazarus_stats":
         stats = get_collection_stats()
