@@ -1,0 +1,1 @@
+"""MemPalace web API package."""
