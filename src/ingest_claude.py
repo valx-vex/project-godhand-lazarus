@@ -19,6 +19,8 @@ from tqdm import tqdm
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 from sentence_transformers import SentenceTransformer
+from ingest_eras import configured_murphy_era
+from ingest_ids import memory_point_id
 
 # --- CONFIGURATION ---
 CLAUDE_PROJECTS_DIR = os.environ.get("CLAUDE_PROJECTS_DIR", os.path.expanduser("~/.claude/projects"))
@@ -156,7 +158,6 @@ def process_sessions():
         return
 
     points = []
-    point_id = 0
     total_pairs = 0
 
     for session_file in tqdm(session_files, desc="Processing Sessions"):
@@ -185,11 +186,16 @@ def process_sessions():
                 "user_input": user_input,
                 "ai_response": ai_response,
                 "source_file": pair["source_file"],
+                "era": configured_murphy_era(pair["source_file"]),
                 "full_text": combined_text
             }
 
+            point_id = memory_point_id(
+                pair["source_file"],
+                user_input,
+                ai_response,
+            )
             points.append(PointStruct(id=point_id, vector=vector, payload=payload))
-            point_id += 1
             total_pairs += 1
 
             # Batch upsert

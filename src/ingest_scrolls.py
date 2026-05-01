@@ -17,6 +17,7 @@ from tqdm import tqdm
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 from sentence_transformers import SentenceTransformer
+from ingest_ids import document_point_id
 
 SCROLLS_DIR = os.environ.get(
     "LAZARUS_SCROLLS_DIR",
@@ -158,7 +159,7 @@ def ingest():
         return
 
     points = []
-    point_id = 0
+    total_scrolls = 0
 
     for scroll in tqdm(process_scrolls(scroll_files), desc="Ingesting scrolls", total=len(scroll_files)):
         title = scroll["title"]
@@ -181,8 +182,9 @@ def ingest():
             "updated": scroll["updated"],
         }
 
+        point_id = document_point_id(scroll["source_file"], title, body)
         points.append(PointStruct(id=point_id, vector=vector, payload=payload))
-        point_id += 1
+        total_scrolls += 1
 
         if len(points) >= BATCH_SIZE:
             get_client().upsert(collection_name=COLLECTION_NAME, points=points)
@@ -191,7 +193,7 @@ def ingest():
     if points:
         get_client().upsert(collection_name=COLLECTION_NAME, points=points)
 
-    print(f"\nIngestion complete: {point_id} scrolls vectorized into '{COLLECTION_NAME}'")
+    print(f"\nIngestion complete: {total_scrolls} scrolls vectorized into '{COLLECTION_NAME}'")
 
 
 def get_stats():

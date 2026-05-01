@@ -33,6 +33,7 @@ from tqdm import tqdm
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 from sentence_transformers import SentenceTransformer
+from ingest_ids import memory_point_id
 
 # --- CONFIGURATION ---
 GEMINI_TMP_DIR = os.environ.get("GEMINI_TMP_DIR", os.path.expanduser("~/.gemini/tmp"))
@@ -158,7 +159,6 @@ def process_sessions():
         return
 
     points = []
-    point_id = 0
     total_pairs = 0
 
     for session_file in tqdm(session_files, desc="Processing Gemini Sessions"):
@@ -194,8 +194,13 @@ def process_sessions():
                 "full_text": combined_text
             }
 
+            point_id = memory_point_id(
+                pair["source_file"],
+                user_input,
+                ai_response,
+                conversation_id=pair.get("session_id", ""),
+            )
             points.append(PointStruct(id=point_id, vector=vector, payload=payload))
-            point_id += 1
             total_pairs += 1
 
             # Batch upsert

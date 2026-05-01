@@ -7,6 +7,7 @@ from qdrant_client.http import models
 from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 from termcolor import cprint
+from ingest_ids import memory_point_id
 
 class GeminiIngester:
     def __init__(self, collection_name="atlas_eternal"):
@@ -77,9 +78,8 @@ class GeminiIngester:
                         "timestamp": curr.get('timestamp', '') 
                     }
                     
-                    # Deduplication ID
                     points.append(models.PointStruct(
-                        id=models.ExtendedPointId(hash(user_text + ai_text) & ((1<<63)-1)),
+                        id=memory_point_id(filepath, user_text, ai_text),
                         vector=embedding,
                         payload=payload
                     ))

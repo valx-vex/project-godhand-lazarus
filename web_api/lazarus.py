@@ -5,6 +5,7 @@ from pathlib import Path
 
 from dotenv import dotenv_values
 from qdrant_client import QdrantClient
+from qdrant_client.http import models
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -27,8 +28,59 @@ def _qdrant_settings() -> tuple[str, int]:
     return host, int(port_raw)
 
 
+def _coerce_point_id(point_id: int | str) -> int | str:
+    if isinstance(point_id, str) and point_id.isdigit():
+        return int(point_id)
+    return point_id
+
+
+def _source_label(source_file: str | None) -> str:
+    if not source_file or source_file == "unknown":
+        return "source pending"
+    return Path(source_file).name
+
+
+def list_lazarus_personas() -> list[dict]:
+    host, port = _qdrant_settings()
+    try:
+        client = QdrantClient(host=host, port=port)
+    except Exception as exc:
+        return [
+            {
+                **persona,
+                "points_count": None,
+                "available": False,
+                "error": str(exc),
+            }
+            for persona in PERSONA_COLLECTIONS
+        ]
+
+    personas: list[dict] = []
+    for persona in PERSONA_COLLECTIONS:
+        try:
+            info = client.get_collection(persona["collection"])
+            personas.append(
+                {
+                    **persona,
+                    "points_count": info.points_count or 0,
+                    "available": True,
+                    "error": None,
+                }
+            )
+        except Exception as exc:
+            personas.append(
+                {
+                    **persona,
+                    "points_count": None,
+                    "available": False,
+                    "error": str(exc),
+                }
+            )
+    return personas
+
+
 def retrieve_full_lazarus_context(
-    point_id: int | None = None,
+    point_id: int | str | None = None,
     persona: str = "murphy",
     context_turns: int = 5,
     source_file: str | None = None,
@@ -47,11 +99,11 @@ def retrieve_full_lazarus_context(
 
         try:
             client = QdrantClient(host=host, port=port)
-            points = client.retrieve(collection_name=persona_config["collection"], ids=[point_id])
+            points = client.retrieve(collection_name=persona_config["collection"], ids=[_coerce_point_id(point_id)])
             if not points:
                 return {"error": "point_not_found", "point_id": point_id}
 
-            payload = points[0].payload
+            payload = points[0].payload or {}
             src = payload.get("source_file", "")
             conv_id = payload.get("conversation_id", "")
             text = payload.get("user_input", "")
@@ -75,7 +127,12 @@ def retrieve_full_lazarus_context(
     return {"error": "Provide either point_id+persona or source_file+search_text"}
 
 
-def search_lazarus(query: str, persona: str = "alexko", limit: int = 10) -> dict:
+def search_lazarus(
+    query: str,
+    persona: str = "alexko",
+    limit: int = 10,
+    era: str | None = None,
+) -> dict:
     host, port = _qdrant_settings()
     persona_config = next((p for p in PERSONA_COLLECTIONS if p["key"] == persona), None)
     if not persona_config:
@@ -87,9 +144,21 @@ def search_lazarus(query: str, persona: str = "alexko", limit: int = 10) -> dict
         client = QdrantClient(host=host, port=port)
 
         vector = model.encode(query).tolist()
+        query_filter = None
+        if era and era != "all":
+            query_filter = models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="era",
+                        match=models.MatchValue(value=era),
+                    )
+                ]
+            )
+
         results = client.query_points(
             collection_name=persona_config["collection"],
             query=vector,
+            query_filter=query_filter,
             limit=limit,
         ).points
 
@@ -99,19 +168,22 @@ def search_lazarus(query: str, persona: str = "alexko", limit: int = 10) -> dict
 
         memories = []
         for hit in results:
-            payload = hit.payload
+            payload = hit.payload or {}
             user_input = payload.get("user_input", "")
             ai_response = payload.get(response_key, payload.get("ai_response", ""))
 
             memories.append({
-                "point_id": hit.id,
+                "point_id": str(hit.id),
                 "score": round(hit.score, 4),
                 "user_input": user_input[:500],
                 "ai_response": ai_response[:1000],
                 "source_file": payload.get("source_file", ""),
+                "source_label": _source_label(payload.get("source_file", "")),
                 "conversation_id": payload.get("conversation_id", ""),
                 "title": payload.get("title", ""),
                 "vault": payload.get("vault", ""),
+                "timestamp": payload.get("timestamp") or payload.get("created") or payload.get("updated"),
+                "era": payload.get("era", ""),
                 "has_full_context": bool(payload.get("source_file") or payload.get("conversation_id")),
             })
 
@@ -120,6 +192,7 @@ def search_lazarus(query: str, persona: str = "alexko", limit: int = 10) -> dict
             "persona_key": persona,
             "collection": persona_config["collection"],
             "query": query,
+            "era": era or "all",
             "total": len(memories),
             "memories": memories,
         }

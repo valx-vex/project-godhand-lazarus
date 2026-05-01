@@ -177,21 +177,22 @@ def get_aaak_spec(service=Depends(_service_dependency)):
 def search_lazarus_endpoint(
     q: str = Query(min_length=1),
     persona: str = Query(default="alexko"),
+    era: str | None = Query(default=None),
     limit: int = Query(default=10, ge=1, le=50),
 ):
     from .lazarus import search_lazarus
-    return search_lazarus(query=q, persona=persona, limit=limit)
+    return search_lazarus(query=q, persona=persona, era=era, limit=limit)
 
 
 @app.get("/api/lazarus/personas")
 def get_lazarus_personas():
-    from .lazarus import PERSONA_COLLECTIONS
-    return {"personas": [{"key": p["key"], "title": p["title"]} for p in PERSONA_COLLECTIONS]}
+    from .lazarus import list_lazarus_personas
+    return {"personas": list_lazarus_personas()}
 
 
 @app.get("/api/lazarus/retrieve_full")
 def retrieve_full_lazarus(
-    point_id: int | None = None,
+    point_id: str | None = None,
     persona: str = Query(default="murphy"),
     context_turns: int = Query(default=5, ge=1, le=20),
     source_file: str | None = None,

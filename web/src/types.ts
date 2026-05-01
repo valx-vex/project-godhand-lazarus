@@ -155,10 +155,14 @@ export interface KnowledgeTimelineResponse {
 export interface LazarusPersona {
   key: string
   title: string
+  collection?: string
+  points_count?: number | null
+  available?: boolean
+  error?: string | null
 }
 
 export interface LazarusMemory {
-  point_id: number
+  point_id: number | string
   score: number
   user_input: string
   ai_response: string
@@ -166,6 +170,9 @@ export interface LazarusMemory {
   conversation_id: string
   title: string
   vault: string
+  timestamp?: string | number | null
+  era?: string
+  source_label?: string
   has_full_context: boolean
 }
 
@@ -174,6 +181,7 @@ export interface LazarusSearchResponse {
   persona_key: string
   collection: string
   query: string
+  era?: string
   total: number
   memories: LazarusMemory[]
   error?: string
@@ -194,7 +202,7 @@ export interface FullContextResponse {
   matched_turn_index: number
   context_range: number[]
   turns: FullContextTurn[]
-  point_id?: number
+  point_id?: number | string
   persona?: string
   error?: string
 }

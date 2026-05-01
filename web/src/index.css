@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,800&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -6,17 +6,24 @@
 
 :root {
   color-scheme: dark;
-  --bg: #050807;
-  --bg-elevated: #0a1110;
-  --surface: rgba(12, 20, 19, 0.82);
-  --surface-strong: rgba(17, 28, 27, 0.94);
-  --line: rgba(125, 227, 223, 0.15);
-  --line-strong: rgba(125, 227, 223, 0.3);
-  --muted: #9aa8a5;
-  --teal: #2bb5b0;
-  --teal-soft: rgba(43, 181, 176, 0.18);
-  --stone: #c1ad8f;
-  --ember: #b14233;
+  --bg: #07080c;
+  --bg-elevated: #0c0d12;
+  --surface: rgba(17, 19, 26, 0.86);
+  --surface-strong: rgba(23, 26, 35, 0.96);
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(122, 215, 255, 0.38);
+  --muted: #9aa2b5;
+  --muted-2: #6a7285;
+  --ghost: #e7ebf2;
+  --teal: #7ad7ff;
+  --teal-soft: rgba(122, 215, 255, 0.14);
+  --stone: #c3c9d4;
+  --ember: #ff3333;
+  --phosphor: #7ad7ff;
+  --phosphor-ink: #031018;
+  --void: #07080c;
+  --steel: #11131a;
+  --steel-2: #171a23;
 }
 
 html,
@@ -27,17 +34,19 @@ body,
 
 body {
   margin: 0;
-  font-family: "IBM Plex Sans", sans-serif;
+  font-family: "Space Grotesk", system-ui, sans-serif;
   background:
-    radial-gradient(circle at top right, rgba(43, 181, 176, 0.12), transparent 35%),
-    radial-gradient(circle at bottom left, rgba(193, 173, 143, 0.12), transparent 40%),
-    linear-gradient(180deg, #040706 0%, #050807 40%, #070c0b 100%);
-  color: #f4f0e8;
+    linear-gradient(rgba(122, 215, 255, 0.024) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(122, 215, 255, 0.018) 1px, transparent 1px),
+    radial-gradient(circle at top right, rgba(122, 215, 255, 0.08), transparent 34%),
+    linear-gradient(180deg, #07080c 0%, #0c0d12 48%, #07080c 100%);
+  background-size: 42px 42px, 42px 42px, auto, auto;
+  color: var(--ghost);
 }
 
 ::selection {
-  background: rgba(125, 227, 223, 0.35);
-  color: #f9fafb;
+  background: var(--phosphor);
+  color: var(--phosphor-ink);
 }
 
 @layer base {
@@ -49,8 +58,8 @@ body {
   h2,
   h3,
   h4 {
-    font-family: "Fraunces", serif;
-    letter-spacing: -0.03em;
+    font-family: "Space Grotesk", system-ui, sans-serif;
+    letter-spacing: 0;
   }
 
   button,
@@ -63,15 +72,15 @@ body {
 
 @layer components {
   .shell-panel {
-    @apply border bg-white/[0.03] shadow-cathedral backdrop-blur-xl;
+    @apply border bg-white/[0.035] shadow-cathedral backdrop-blur-xl;
   }
 
   .section-frame {
-    @apply shell-panel overflow-hidden rounded-[1.75rem];
+    @apply shell-panel overflow-hidden rounded-md;
   }
 
   .eyebrow {
-    @apply text-[0.72rem] uppercase tracking-[0.28em] text-[var(--stone)];
+    @apply font-mono text-[0.68rem] uppercase tracking-[0.22em] text-[var(--muted)];
   }
 
   .support-copy {
@@ -79,15 +88,15 @@ body {
   }
 
   .nav-link {
-    @apply flex items-center justify-between rounded-full border border-transparent px-4 py-3 text-sm text-stone-300 transition duration-200 hover:border-white/10 hover:bg-white/[0.04] hover:text-white;
+    @apply flex flex-col items-start gap-1 rounded border border-transparent px-4 py-3 text-sm text-stone-300 transition duration-200 hover:border-white/10 hover:bg-white/[0.04] hover:text-white;
   }
 
   .nav-link-active {
-    @apply border-[var(--line-strong)] bg-[var(--teal-soft)] text-white;
+    @apply border-[var(--line-strong)] bg-[var(--teal-soft)] text-white shadow-[0_0_18px_rgba(122,215,255,0.12)];
   }
 
   .metric-strip {
-    @apply rounded-[1.25rem] border border-white/10 bg-black/20 px-5 py-5;
+    @apply rounded border border-white/10 bg-black/25 px-5 py-5;
   }
 
   .list-item {
@@ -95,15 +104,15 @@ body {
   }
 
   .field-shell {
-    @apply rounded-[1rem] border border-white/10 bg-black/20 px-4 py-3 text-sm text-stone-100 outline-none transition focus:border-[var(--line-strong)] focus:bg-black/30;
+    @apply rounded border border-white/10 bg-black/25 px-4 py-3 text-sm text-stone-100 outline-none transition focus:border-[var(--line-strong)] focus:bg-black/35;
   }
 
   .action-button {
-    @apply inline-flex items-center justify-center rounded-full border border-[var(--line-strong)] bg-[var(--teal-soft)] px-5 py-3 text-sm font-semibold text-white transition hover:border-teal-300 hover:bg-teal-500/20;
+    @apply inline-flex items-center justify-center rounded border border-[var(--line-strong)] bg-[var(--teal-soft)] px-5 py-3 font-mono text-xs font-semibold uppercase tracking-[0.16em] text-white transition hover:border-sky-200 hover:bg-sky-400/20;
   }
 
   .ghost-button {
-    @apply inline-flex items-center justify-center rounded-full border border-white/10 px-4 py-2 text-sm text-stone-300 transition hover:border-[var(--line-strong)] hover:text-white;
+    @apply inline-flex items-center justify-center rounded border border-white/10 px-4 py-2 font-mono text-xs uppercase tracking-[0.14em] text-stone-300 transition hover:border-[var(--line-strong)] hover:text-white;
   }
 
   .content-fade {
@@ -119,19 +128,73 @@ body {
   }
 
   .markdown-body a {
-    @apply text-teal-300 underline decoration-teal-500/40 underline-offset-4;
+    @apply text-sky-200 underline decoration-sky-300/40 underline-offset-4;
   }
 
   .markdown-body code {
-    @apply rounded bg-white/[0.06] px-1.5 py-0.5 text-xs text-teal-200;
+    @apply rounded bg-white/[0.06] px-1.5 py-0.5 text-xs text-sky-100;
   }
 
   .markdown-body pre {
-    @apply overflow-x-auto rounded-2xl border border-white/10 bg-black/30 p-4;
+    @apply overflow-x-auto rounded border border-white/10 bg-black/30 p-4;
   }
 
   .markdown-body ul {
     @apply m-0 list-disc space-y-2 pl-5;
+  }
+
+  .lazarus-page {
+    @apply -m-7 min-h-full bg-[var(--void)] text-[var(--ghost)];
+  }
+
+  .lazarus-command-deck {
+    background:
+      linear-gradient(90deg, rgba(122, 215, 255, 0.12), transparent 54%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.055), transparent);
+  }
+
+  .lazarus-search-input {
+    @apply h-16 w-full rounded border border-white/10 bg-black/35 px-5 font-mono text-base text-white outline-none transition placeholder:text-[var(--muted-2)] focus:border-[var(--phosphor)] focus:shadow-[0_0_28px_rgba(122,215,255,0.16)];
+  }
+
+  .persona-pill {
+    @apply inline-flex min-h-12 items-center gap-3 rounded border border-white/10 bg-white/[0.035] px-4 py-2 text-left text-sm text-stone-300 transition hover:border-[var(--line-strong)] hover:text-white;
+  }
+
+  .persona-pill-active {
+    @apply border-[var(--phosphor)] bg-[var(--teal-soft)] text-white shadow-[0_0_22px_rgba(122,215,255,0.14)];
+  }
+
+  .era-pill {
+    @apply inline-flex h-9 items-center rounded border border-white/10 bg-black/25 px-3 font-mono text-[0.68rem] uppercase tracking-[0.14em] text-stone-400 transition hover:border-[var(--line-strong)] hover:text-white;
+  }
+
+  .era-pill-active {
+    @apply border-[var(--phosphor)] bg-[var(--teal-soft)] text-white;
+  }
+
+  .memory-row {
+    @apply w-full rounded border border-white/10 bg-white/[0.035] px-5 py-4 text-left transition duration-200 hover:border-[var(--line-strong)] hover:bg-white/[0.055];
+  }
+
+  .memory-row-active {
+    @apply border-[var(--phosphor)] bg-[var(--teal-soft)] shadow-[0_0_22px_rgba(122,215,255,0.12)];
+  }
+
+  .reader-bubble {
+    @apply max-w-[86%] rounded border border-white/10 bg-white/[0.045] px-5 py-4 text-sm leading-7 text-stone-200;
+  }
+
+  .reader-bubble-user {
+    @apply ml-auto border-[var(--line-strong)] bg-[rgba(122,215,255,0.10)] text-sky-50;
+  }
+
+  .reader-bubble-match {
+    @apply border-[var(--phosphor)] shadow-[0_0_30px_rgba(122,215,255,0.18)];
+  }
+
+  .reader-scroll {
+    scrollbar-color: rgba(122, 215, 255, 0.42) rgba(255, 255, 255, 0.04);
   }
 }
 

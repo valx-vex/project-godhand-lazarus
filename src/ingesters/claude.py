@@ -1,13 +1,14 @@
 import json
 import os
 import glob
-import hashlib
 from typing import List, Dict
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 from termcolor import cprint
+from ingest_eras import configured_murphy_era
+from ingest_ids import memory_point_id
 
 QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
 QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
@@ -90,12 +91,11 @@ class ClaudeIngester:
                         "user_input": user_text,
                         "ai_response": ai_text,
                         "source_file": os.path.basename(filepath),
-                        "timestamp": curr.get('created_at', '') 
+                        "timestamp": curr.get('created_at', ''),
+                        "era": configured_murphy_era(filepath),
                     }
                     
-                    # Deterministic ID from content hash for deduplication
-                    content_hash = hashlib.md5((user_text + ai_text).encode()).hexdigest()
-                    point_id = int(content_hash[:15], 16)
+                    point_id = memory_point_id(filepath, user_text, ai_text)
 
                     points.append(models.PointStruct(
                         id=point_id,

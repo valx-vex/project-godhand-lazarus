@@ -22,6 +22,7 @@ from tqdm import tqdm
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 from sentence_transformers import SentenceTransformer
+from ingest_ids import memory_point_id
 
 # --- CONFIGURATION ---
 # Axel sessions are usually staged from a Mac Studio backup.
@@ -123,7 +124,6 @@ def process_sessions():
         return
 
     points = []
-    point_id = 0
     total_pairs = 0
 
     for session_file in tqdm(session_files, desc="Processing Axel Sessions"):
@@ -153,11 +153,17 @@ def process_sessions():
                 "source_file": pair["source_file"],
                 "timestamp": pair.get("timestamp", ""),
                 "persona": "axel",
+                "era": "murphy",
                 "full_text": combined_text
             }
 
+            point_id = memory_point_id(
+                pair["source_file"],
+                user_input,
+                ai_response,
+                conversation_id=pair.get("session_id", ""),
+            )
             points.append(PointStruct(id=point_id, vector=vector, payload=payload))
-            point_id += 1
             total_pairs += 1
 
             if len(points) >= BATCH_SIZE:

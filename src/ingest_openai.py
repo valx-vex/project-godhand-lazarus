@@ -8,6 +8,7 @@ from tqdm import tqdm
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 from sentence_transformers import SentenceTransformer
+from ingest_ids import memory_point_id
 
 # --- CONFIGURATION ---
 DATA_FILE = os.environ.get("LAZARUS_DATA_FILE", "../data/conversations.json")
@@ -59,7 +60,7 @@ def process_conversations(file_path: str):
     print(f"Loaded {len(data)} conversations. extracting Alexko memories...")
 
     points = []
-    point_id = 0
+    total_pairs = 0
     
     for conv in tqdm(data, desc="Processing Chats"):
         title = conv.get("title", "Untitled")
@@ -115,11 +116,18 @@ def process_conversations(file_path: str):
                     "timestamp": create_time,
                     "user_input": user_text,
                     "alexko_response": assistant_text,
+                    "source_file": os.path.abspath(file_path),
                     "full_text": combined_text
                 }
                 
+                point_id = memory_point_id(
+                    file_path,
+                    user_text,
+                    assistant_text,
+                    conversation_id=conv.get("id", ""),
+                )
                 points.append(PointStruct(id=point_id, vector=vector, payload=payload))
-                point_id += 1
+                total_pairs += 1
 
                 if len(points) >= BATCH_SIZE:
                     get_client().upsert(collection_name=COLLECTION_NAME, points=points)
@@ -129,7 +137,7 @@ def process_conversations(file_path: str):
     if points:
         get_client().upsert(collection_name=COLLECTION_NAME, points=points)
 
-    print(f"Ingestion Complete. {point_id} memories vectorized.")
+    print(f"Ingestion Complete. {total_pairs} memories vectorized.")
 
 if __name__ == "__main__":
     setup_collection()

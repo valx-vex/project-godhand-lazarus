@@ -112,11 +112,11 @@ export const api = {
   getLazarusPersonas() {
     return readJson<{ personas: LazarusPersona[] }>(buildUrl("/lazarus/personas"))
   },
-  searchLazarus(query: string, params: { persona?: string; limit?: number } = {}) {
+  searchLazarus(query: string, params: { persona?: string; era?: string; limit?: number } = {}) {
     return readJson<LazarusSearchResponse>(buildUrl("/lazarus/search", { q: query, ...params }))
   },
   retrieveFullContext(params: {
-    point_id?: number
+    point_id?: number | string
     persona: string
     context_turns?: number
     source_file?: string
