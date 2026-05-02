@@ -23,7 +23,8 @@ export function AppShell({
 }) {
   const location = useLocation()
   const active = navItems.find((item) => item.to === location.pathname)?.label ?? "Lazarus"
-  const showInspector = location.pathname !== "/lazarus"
+  const isLazarus = location.pathname === "/lazarus"
+  const showInspector = !isLazarus
 
   return (
     <div className="min-h-screen px-4 py-4 text-stone-100 lg:px-6">
@@ -72,12 +73,14 @@ export function AppShell({
           </div>
         </aside>
 
-        <main className="content-fade section-frame flex min-h-[70vh] flex-col overflow-hidden">
-          <div className="border-b border-white/10 px-7 py-5">
-            <p className="eyebrow">Memory control room</p>
-            <h2 className="mt-2 text-3xl text-stone-50">{active}</h2>
-          </div>
-          <div className="flex-1 overflow-y-auto px-7 py-7">{children}</div>
+        <main className={`content-fade section-frame flex min-h-[70vh] flex-col overflow-hidden ${isLazarus ? "lazarus-main" : ""}`}>
+          {!isLazarus && (
+            <div className="border-b border-white/10 px-7 py-5">
+              <p className="eyebrow">Memory control room</p>
+              <h2 className="mt-2 text-3xl text-stone-50">{active}</h2>
+            </div>
+          )}
+          <div className={`flex-1 overflow-y-auto ${isLazarus ? "" : "px-7 py-7"}`}>{children}</div>
         </main>
 
         {showInspector && <aside className="content-fade">{inspector}</aside>}

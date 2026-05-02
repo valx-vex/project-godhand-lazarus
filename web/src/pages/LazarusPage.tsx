@@ -180,6 +180,7 @@ export function LazarusPage() {
   const [playbackSpeed, setPlaybackSpeed] = useState(1)
   const [isPlaying, setIsPlaying] = useState(false)
   const [playbackIndex, setPlaybackIndex] = useState(0)
+  const [readerExpanded, setReaderExpanded] = useState(false)
   const readerRef = useRef<HTMLDivElement>(null)
 
   const personaList = personas.length ? personas : fallbackPersonas
@@ -284,6 +285,7 @@ export function LazarusPage() {
       setFullContext(null)
       setIsPlaying(false)
       setPlaybackIndex(0)
+      setReaderExpanded(true)
 
       try {
         const ctx = await api.retrieveFullContext({
@@ -400,8 +402,8 @@ export function LazarusPage() {
         )}
       </section>
 
-      <section className="grid min-h-[720px] gap-0 xl:grid-cols-[minmax(360px,0.78fr)_minmax(0,1.22fr)]">
-        <div className="border-r border-white/10 px-6 py-6">
+      <section className={`grid min-h-[720px] gap-0 transition-all duration-300 ${readerExpanded ? "" : "xl:grid-cols-[minmax(360px,0.78fr)_minmax(0,1.22fr)]"}`}>
+        <div className={`border-r border-white/10 px-6 py-6 ${readerExpanded ? "hidden" : ""}`}>
           <div className="mb-4 flex items-center justify-between gap-4">
             <div>
               <p className="eyebrow">Signal field</p>
@@ -453,11 +455,22 @@ export function LazarusPage() {
         <div className="flex min-h-[720px] flex-col">
           <div className="border-b border-white/10 px-6 py-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="eyebrow">Full context reader</p>
-                <h4 className="mt-2 text-2xl font-semibold text-white">
-                  {selectedMemory?.title || selectedMemory?.source_label || "No memory selected"}
-                </h4>
+              <div className="flex items-center gap-4">
+                {readerExpanded && (
+                  <button
+                    className="ghost-button px-3 py-1.5 text-xs"
+                    onClick={() => setReaderExpanded(false)}
+                    type="button"
+                  >
+                    ← Results
+                  </button>
+                )}
+                <div>
+                  <p className="eyebrow">Full context reader</p>
+                  <h4 className="mt-2 text-2xl font-semibold text-white">
+                    {selectedMemory?.title || selectedMemory?.source_label || "No memory selected"}
+                  </h4>
+                </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <button

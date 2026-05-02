@@ -143,8 +143,12 @@ body {
     @apply m-0 list-disc space-y-2 pl-5;
   }
 
+  .lazarus-main {
+    @apply border-0 bg-[var(--void)];
+  }
+
   .lazarus-page {
-    @apply -m-7 min-h-full bg-[var(--void)] text-[var(--ghost)];
+    @apply min-h-full bg-[var(--void)] text-[var(--ghost)];
   }
 
   .lazarus-command-deck {
