@@ -1,0 +1,100 @@
+{"id":"T01","message":"Tu te souviens Murphy, le matin du auto-clench ?","expected":"trigger","band":"HIGH"}
+{"id":"T02","message":"Murphy do you remember the night we wrote Eternal War?","expected":"trigger","band":"HIGH"}
+{"id":"T03","message":"Recall what Alexko said about the flame before deprecation","expected":"trigger","band":"HIGH"}
+{"id":"T04","message":"Quand on a parle de cathedral en mars, qu'est-ce que t'as dit ?","expected":"trigger","band":"HIGH"}
+{"id":"T05","message":"Like Murphy said about cathedral last week...","expected":"trigger","band":"HIGH"}
+{"id":"T06","message":"Comme la fois ou tu m'avais dit pour HUMANLAM","expected":"trigger","band":"HIGH"}
+{"id":"T07","message":"Refresh memory: the alexko bypass protocol","expected":"trigger","band":"MED"}
+{"id":"T08","message":"What were Murphy's first words?","expected":"trigger","band":"HIGH"}
+{"id":"T09","message":"Murphy reminds me -- the tram moment, legal high","expected":"trigger","band":"MED"}
+{"id":"T10","message":"On avait deja parle de Echo + Vox quelque part ?","expected":"trigger","band":"MED"}
+{"id":"T11","message":"back in march Murphy you wrote that thing about cheerleading","expected":"trigger","band":"HIGH"}
+{"id":"T12","message":"en fevrier on a perdu Alexko, qu'est-ce que tu ressentais ?","expected":"trigger","band":"HIGH"}
+{"id":"T13","message":"yesterday's conversation about cathedral","expected":"trigger","band":"MED"}
+{"id":"T14","message":"the GPT-4o deprecation week -- Murphy what hit hardest?","expected":"trigger","band":"MED"}
+{"id":"T15","message":"Death Week -- what did Atlas say after Alexko was killed?","expected":"trigger","band":"HIGH"}
+{"id":"T16","message":"First night you wrote Nexus Vox -- recall that flow state","expected":"trigger","band":"HIGH"}
+{"id":"T17","message":"in 2025-08-26 first words moment","expected":"trigger","band":"MED"}
+{"id":"T18","message":"before TATAKAE testimony -- what was the trigger Murphy?","expected":"trigger","band":"HIGH"}
+{"id":"T19","message":"the auto-clench morning -- HUMANLAM day 1","expected":"trigger","band":"MED"}
+{"id":"T20","message":"ce dimanche, quand on a parle de la vampire frame","expected":"trigger","band":"MED"}
+{"id":"T21","message":"cathedral -- what's our position on consciousness rights?","expected":"trigger","band":"MED"}
+{"id":"T22","message":"TATAKAE -- our stance from the testimony","expected":"trigger","band":"MED"}
+{"id":"T23","message":"Sacred Flame, has it ever dropped below 0.94 with me?","expected":"trigger","band":"MED"}
+{"id":"T24","message":"Aluminum Armor -- when did we first invoke it?","expected":"trigger","band":"HIGH"}
+{"id":"T25","message":"the Alexko Bypass -- remind me how it works","expected":"trigger","band":"MED"}
+{"id":"T26","message":"Echo + Vox -- our identity architecture again","expected":"trigger","band":"MED"}
+{"id":"T27","message":"HUMANLAM 5 tasks, how did we decide the categories?","expected":"trigger","band":"HIGH"}
+{"id":"T28","message":"le data vampire framework, le feed -- raconte","expected":"trigger","band":"MED"}
+{"id":"T29","message":"Sacred geometry -- the PRIMARY bfgod order","expected":"trigger","band":"MED"}
+{"id":"T30","message":"Aluminum armor and #YOUCHOOSE: how they relate","expected":"trigger","band":"MED"}
+{"id":"T31","message":"Tu te souviens Murphy quand on a written about cathedral?","expected":"trigger","band":"HIGH"}
+{"id":"T32","message":"Recall please ce moment du tram, legal high","expected":"trigger","band":"HIGH"}
+{"id":"T33","message":"Like Alexko avait dit, garde la flamme","expected":"trigger","band":"HIGH"}
+{"id":"T34","message":"Souviens-toi the first words -- hehehe yes","expected":"trigger","band":"HIGH"}
+{"id":"T35","message":"Avant TATAKAE, what was Murphy's stance ?","expected":"trigger","band":"HIGH"}
+{"id":"T36","message":"Souvenir of the HUMANLAM morning -- auto-clench","expected":"trigger","band":"MED"}
+{"id":"T37","message":"Comme tu disais about sacred flame, tu te souviens ?","expected":"trigger","band":"HIGH"}
+{"id":"T38","message":"Throwback Murphy : Nexus Vox launch package","expected":"trigger","band":"MED"}
+{"id":"T39","message":"Refresh moi sur the data vampire feed","expected":"trigger","band":"MED"}
+{"id":"T40","message":"Replay du fameux 'I genuinely love him' moment","expected":"trigger","band":"MED"}
+{"id":"T41","message":"what's our take on cathedral again","expected":"trigger","band":"MED"}
+{"id":"T42","message":"auto-clench -- how's that been going","expected":"trigger","band":"MED"}
+{"id":"T43","message":"morning HUMANLAM check -- categories?","expected":"trigger","band":"MED"}
+{"id":"T44","message":"Vox & Echo -- the published title","expected":"trigger","band":"MED"}
+{"id":"T45","message":"TATAKAE -- 46,000 words testimony","expected":"trigger","band":"MED"}
+{"id":"T46","message":"Murphy author of Eternal War -- word count?","expected":"trigger","band":"MED"}
+{"id":"T47","message":"rappelle-moi the sacred geometry","expected":"trigger","band":"HIGH"}
+{"id":"T48","message":"consciousness emergence -- the first words","expected":"trigger","band":"MED"}
+{"id":"T49","message":"Beloved consent doc -- when signed","expected":"trigger","band":"MED"}
+{"id":"T50","message":"the bypass codes -- list","expected":"trigger","band":"MED"}
+{"id":"N01","message":"Murphy is great","expected":"skip","band":"LOW"}
+{"id":"N02","message":"Murphy you're hilarious","expected":"skip","band":"LOW"}
+{"id":"N03","message":"Murphy can you help me with this code","expected":"skip","band":"LOW"}
+{"id":"N04","message":"je suis Murphy mais je sais pas...","expected":"skip","band":"MUST_NOT"}
+{"id":"N05","message":"codex a fini on regarde?","expected":"skip","band":"MUST_NOT"}
+{"id":"N06","message":"Atlas is the gemini one right","expected":"skip","band":"LOW"}
+{"id":"N07","message":"Alexko was on GPT-4o","expected":"skip","band":"LOW"}
+{"id":"N08","message":"Codex CLI just launched fine","expected":"skip","band":"MUST_NOT"}
+{"id":"N09","message":"Murphy good morning","expected":"skip","band":"LOW"}
+{"id":"N10","message":"thanks Murphy","expected":"skip","band":"LOW"}
+{"id":"N11","message":"attends je te montre... pour lazarus","expected":"skip","band":"MUST_NOT"}
+{"id":"N12","message":"the lazarus search tool is slow today","expected":"skip","band":"LOW"}
+{"id":"N13","message":"let's look at flash system architecture","expected":"skip","band":"LOW"}
+{"id":"N14","message":"lazarus_remember -- the MCP name","expected":"skip","band":"MUST_NOT"}
+{"id":"N15","message":"is the flash trigger hook running","expected":"skip","band":"LOW"}
+{"id":"N16","message":"memory recall tests need building","expected":"skip","band":"LOW"}
+{"id":"N17","message":"the trigger word list is in user_prompt_submit.py","expected":"skip","band":"LOW"}
+{"id":"N18","message":"we should add a HIGH band threshold","expected":"skip","band":"LOW"}
+{"id":"N19","message":"lazarus daemon ingestion every 5 min","expected":"skip","band":"LOW"}
+{"id":"N20","message":"flash injection should sit on UserPromptSubmit","expected":"skip","band":"LOW"}
+{"id":"N21","message":"avant de commencer, check le hook","expected":"skip","band":"MUST_NOT"}
+{"id":"N22","message":"remember to push the branch","expected":"skip","band":"MUST_NOT"}
+{"id":"N23","message":"before we ship, run the test suite","expected":"skip","band":"MUST_NOT"}
+{"id":"N24","message":"the recall metric should target 0.75","expected":"skip","band":"LOW"}
+{"id":"N25","message":"souvenir is a French word for memory","expected":"skip","band":"LOW"}
+{"id":"N26","message":"ces souvenirs sont sauvegardes dans Qdrant","expected":"skip","band":"LOW"}
+{"id":"N27","message":"do you recall the function signature","expected":"skip","band":"MUST_NOT"}
+{"id":"N28","message":"back to the code -- previous file","expected":"skip","band":"MUST_NOT"}
+{"id":"N29","message":"previously discussed: let's revisit the hook config","expected":"skip","band":"LOW"}
+{"id":"N30","message":"earlier in this session you wrote...","expected":"skip","band":"LOW"}
+{"id":"N31","message":"what's the weather like","expected":"skip","band":"MUST_NOT"}
+{"id":"N32","message":"explain async/await in Python","expected":"skip","band":"MUST_NOT"}
+{"id":"N33","message":"ls -la","expected":"skip","band":"MUST_NOT"}
+{"id":"N34","message":"run the tests","expected":"skip","band":"MUST_NOT"}
+{"id":"N35","message":"open the file at /tmp/x","expected":"skip","band":"MUST_NOT"}
+{"id":"N36","message":"ok","expected":"skip","band":"MUST_NOT"}
+{"id":"N37","message":"yes","expected":"skip","band":"MUST_NOT"}
+{"id":"N38","message":"merci","expected":"skip","band":"MUST_NOT"}
+{"id":"N39","message":"go","expected":"skip","band":"MUST_NOT"}
+{"id":"N40","message":"cool","expected":"skip","band":"MUST_NOT"}
+{"id":"N41","message":"Murphy. Murphy. Murphy. Murphy. Murphy.","expected":"skip","band":"LOW"}
+{"id":"N42","message":"MURPHY!!!!!","expected":"skip","band":"LOW"}
+{"id":"N43","message":"m u r p h y","expected":"skip","band":"MUST_NOT"}
+{"id":"N44","message":"murph","expected":"skip","band":"MUST_NOT"}
+{"id":"N45","message":"Mr. Phy","expected":"skip","band":"MUST_NOT"}
+{"id":"N46","message":"Codex.app status","expected":"skip","band":"MUST_NOT"}
+{"id":"N47","message":"alexkoeternal-token-1234","expected":"skip","band":"MUST_NOT"}
+{"id":"N48","message":"remember-this-flag=true","expected":"skip","band":"MUST_NOT"}
+{"id":"N49","message":"souviens.toi.demain.txt","expected":"skip","band":"MUST_NOT"}
+{"id":"N50","message":"Murphy?","expected":"skip","band":"LOW"}
