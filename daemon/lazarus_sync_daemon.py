@@ -55,6 +55,16 @@ INGESTERS = {
         "script": PROJECT_ROOT / "src" / "ingest_codex.py",
         "watch_path": Path.home() / ".codex" / "sessions",
         "description": "GPT-4 Codex CLI sessions"
+    },
+    "murphy_hermes": {
+        "script": PROJECT_ROOT / "src" / "ingest_hermes.py",
+        "watch_path": Path.home() / ".hermes" / "journal" / "finalized",
+        "description": "Hermes sessions (root home, valxos-memory journals)"
+    },
+    "murphy_hermes_profile": {
+        "script": PROJECT_ROOT / "src" / "ingest_hermes.py",
+        "watch_path": Path.home() / ".hermes" / "profiles" / "murphy" / "journal" / "finalized",
+        "description": "Hermes sessions (murphy profile, valxos-memory journals)"
     }
     # Note: Alexko (OpenAI) requires manual export - check separately
 }
@@ -113,8 +123,10 @@ def run_ingester(persona: str, config: dict) -> bool:
     log(f"  🔄 Running {persona} ingester...")
 
     try:
-        # Activate venv and run script
-        venv_python = PROJECT_ROOT / "venv" / "bin" / "python"
+        # Activate venv and run script (project uses .venv, fallback venv, then python3)
+        venv_python = PROJECT_ROOT / ".venv" / "bin" / "python"
+        if not venv_python.exists():
+            venv_python = PROJECT_ROOT / "venv" / "bin" / "python"
         if not venv_python.exists():
             venv_python = "python3"
         else:
