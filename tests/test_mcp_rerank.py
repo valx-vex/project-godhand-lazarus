@@ -84,3 +84,38 @@ def test_unknown_persona_unchanged(monkeypatch, tmp_path):
     _wire(monkeypatch, tmp_path, [])
     result = lazarus_mcp.search_memories("q", "nobody", limit=1)
     assert "error" in result
+
+
+def test_summon_cli_reranks_and_logs(monkeypatch, tmp_path, capsys):
+    import summon
+
+    hits = [FakeHit(1, 0.9, {"user_input": "a", "ai_response": "plain memory"}),
+            FakeHit(2, 0.8, {"user_input": "b", "ai_response": "pinned memory",
+                             "salience_pinned": True})]
+
+    class FakeSummonClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def query_points(self, **kwargs):
+            assert kwargs.get("query_filter") is not None
+            return FakeResponse(hits)
+
+    class FakeST:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def encode(self, text):
+            import numpy as np
+            return np.zeros(4)
+
+    monkeypatch.setattr(summon, "QdrantClient", FakeSummonClient)
+    monkeypatch.setattr(summon, "SentenceTransformer", FakeST)
+    monkeypatch.setenv("LAZARUS_RETRIEVAL_LOG", str(tmp_path / "log.jsonl"))
+    summon.summon("q", "murphy")
+    out = capsys.readouterr().out
+    assert out.index("pinned memory") < out.index("plain memory")
+    lines = (tmp_path / "log.jsonl").read_text().strip().splitlines()
+    record = json.loads(lines[0])
+    assert record["tool"] == "summon_cli"
+    assert [r["id"] for r in record["results"]] == [2, 1]

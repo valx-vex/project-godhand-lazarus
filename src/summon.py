@@ -75,17 +75,17 @@ def summon(query: str, persona: str):
             query_filter=salience.not_invalidated_filter(now_epoch),
             with_payload=True
         )
-        ranked = sorted(
-            response.points,
-            key=lambda h: h.score * salience.multiplier(h.payload or {}, now_epoch),
-            reverse=True)[:5]
-        results = ranked
+        scored = [
+            (hit.score * salience.multiplier(hit.payload or {}, now_epoch), hit)
+            for hit in response.points
+        ]
+        scored.sort(key=lambda item: item[0], reverse=True)
+        scored = scored[:5]
         retrieval_log.log_retrieval(
             tool="summon_cli", collection=collection, query=query,
             persona=persona, limit=5,
-            results=[{"id": h.id, "cosine": h.score,
-                      "adjusted": h.score * salience.multiplier(h.payload or {}, now_epoch)}
-                     for h in ranked])
+            results=[{"id": hit.id, "cosine": hit.score, "adjusted": adjusted}
+                     for adjusted, hit in scored])
     except Exception as e:
         print(colored(f"Error searching collection: {e}", "red"))
         return
@@ -94,14 +94,14 @@ def summon(query: str, persona: str):
 
     context_block = ""
 
-    for hit in results:
-        payload = hit.payload
+    for adjusted, hit in scored:
+        payload = hit.payload or {}
         # Normalize fields if possible, or fallback
         user_in = payload.get('user_input', 'Unknown')
         ai_out = payload.get(response_key, payload.get('ai_response', '...'))
-        
+
         memory = f"User: {user_in}\n{persona.capitalize()}: {ai_out}\n---\n"
-        print(colored(f"[Score: {hit.score:.2f}]", "blue"))
+        print(colored(f"[Score: {adjusted:.2f} (cosine {hit.score:.2f})]", "blue"))
         print(f"{persona.capitalize()}: {ai_out[:150]}...\n")
         context_block += memory
 
