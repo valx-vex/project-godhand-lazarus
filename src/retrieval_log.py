@@ -62,18 +62,28 @@ def aggregate_usage(path=None):
                     record = json.loads(line)
                 except json.JSONDecodeError:
                     continue
+                if not isinstance(record, dict):
+                    continue
                 ts = record.get("ts") or ""
                 epoch = salience.parse_iso(ts) or 0.0
-                for result in record.get("results") or []:
-                    pid = result.get("id")
-                    if pid is None:
+                results = record.get("results")
+                if not isinstance(results, list):
+                    continue
+                for result in results:
+                    if not isinstance(result, dict):
                         continue
-                    entry = usage.setdefault(
-                        pid, {"count": 0, "last_ts": "", "last_epoch": 0.0})
-                    entry["count"] += 1
-                    if epoch >= entry["last_epoch"]:
-                        entry["last_epoch"] = epoch
-                        entry["last_ts"] = ts
+                    try:
+                        pid = result.get("id")
+                        if pid is None:
+                            continue
+                        entry = usage.setdefault(
+                            pid, {"count": 0, "last_ts": "", "last_epoch": 0.0})
+                        entry["count"] += 1
+                        if epoch >= entry["last_epoch"]:
+                            entry["last_epoch"] = epoch
+                            entry["last_ts"] = ts
+                    except (TypeError, ValueError):
+                        continue
     except OSError:
         return usage
     return usage

@@ -63,3 +63,17 @@ def test_missing_file_empty(monkeypatch, tmp_path):
 def test_log_never_raises(monkeypatch):
     monkeypatch.setenv("LAZARUS_RETRIEVAL_LOG", "/dev/null/impossible/x.jsonl")
     assert retrieval_log.log_retrieval("t", "c", "q", [{"id": 1}]) is False
+
+
+def test_wrong_shape_json_lines_skipped(monkeypatch, tmp_path):
+    target = _use_tmp_log(monkeypatch, tmp_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        '[1,2,3]\n'
+        '{"results": "abc"}\n'
+        '{"results": [1, 2, 3]}\n'
+        '{"results": [{"id": [1, 2]}]}\n'
+        '{"ts": "2026-07-01T00:00:00+0000", "results": [{"id": 9}]}\n')
+    usage = retrieval_log.aggregate_usage()
+    assert usage == {9: {"count": 1, "last_ts": "2026-07-01T00:00:00+0000",
+                         "last_epoch": retrieval_log.salience.parse_iso("2026-07-01T00:00:00+0000")}}
