@@ -52,13 +52,28 @@ def test_multiplier_pin_floor():
 
 
 def test_live_salience_prefers_last_access_over_created():
-    now = 1_000_000_000.0
-    old = "2020-01-01T00:00:00+0000"
-    payload = {"created_at": old, "last_accessed_at": "2001-09-09T01:46:40+0000",
+    now = salience.parse_iso("2026-07-06T00:00:00+0000")
+    # created_at 100 days before now (recency exp(-5) ~ 0.0067), last_accessed_at
+    # exactly at now (recency 1.0). The two branches yield DIFFERENT recencies,
+    # so this actually proves last_accessed_at wins.
+    created = "2026-03-28T00:00:00+0000"  # 100 days before 2026-07-06
+    payload = {"created_at": created, "last_accessed_at": "2026-07-06T00:00:00+0000",
                "novelty": 0.0, "usage_norm": 0.0}
-    # last_accessed_at == epoch 1_000_000_000 -> recency 1.0 -> s = 0.35
     value = salience.live_salience(payload, now_epoch=now)
-    assert abs(value - 0.35) < 1e-6
+    assert abs(value - 0.35) < 1e-6  # recency 1.0 from last access -> 0.35*1.0
+
+    # Drop last_accessed_at: now the decayed created_at drives recency (~0.0067),
+    # so salience collapses toward zero -> proves the fallback branch differs.
+    payload.pop("last_accessed_at")
+    fallback = salience.live_salience(payload, now_epoch=now)
+    assert fallback < 0.01
+
+
+def test_multiplier_malformed_novelty_does_not_raise():
+    m = salience.multiplier({"novelty": "garbage",
+                             "created_at": "2026-07-05T00:00:00+0000"})
+    assert isinstance(m, float)
+    assert 0.75 <= m <= 1.25
 
 
 def test_created_at_from_source_hermes():

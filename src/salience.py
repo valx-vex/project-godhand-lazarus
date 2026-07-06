@@ -100,15 +100,20 @@ def live_salience(payload, now_epoch=None):
         return None
     if now_epoch is None:
         now_epoch = time.time()
-    last = (parse_iso(payload.get("last_accessed_at"))
-            or parse_iso(payload.get("created_at")))
+    last = parse_iso(payload.get("last_accessed_at"))
+    if last is None:
+        last = parse_iso(payload.get("created_at"))
     novelty = payload.get("novelty")
     usage = payload.get("usage_norm")
-    value = composite(
-        recency_score(now_epoch, last),
-        float(novelty) if novelty is not None else NOVELTY_DEFAULT,
-        float(usage) if usage is not None else 0.0,
-    )
+    try:
+        novelty_value = float(novelty) if novelty is not None else NOVELTY_DEFAULT
+    except (TypeError, ValueError):
+        novelty_value = NOVELTY_DEFAULT
+    try:
+        usage_value = float(usage) if usage is not None else 0.0
+    except (TypeError, ValueError):
+        usage_value = 0.0
+    value = composite(recency_score(now_epoch, last), novelty_value, usage_value)
     if payload.get("salience_pinned"):
         value = max(value, PIN_FLOOR)
     return value
