@@ -5,6 +5,12 @@ from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
 from termcolor import colored
 
+import time
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import retrieval_log
+import salience
+
 # --- CONFIG ---
 QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
 QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
@@ -61,13 +67,25 @@ def summon(query: str, persona: str):
     
     try:
         vector = model.encode(query).tolist()
+        now_epoch = time.time()
         response = client.query_points(
             collection_name=collection,
             query=vector,
-            limit=5,
+            limit=15,
+            query_filter=salience.not_invalidated_filter(now_epoch),
             with_payload=True
         )
-        results = response.points
+        ranked = sorted(
+            response.points,
+            key=lambda h: h.score * salience.multiplier(h.payload or {}, now_epoch),
+            reverse=True)[:5]
+        results = ranked
+        retrieval_log.log_retrieval(
+            tool="summon_cli", collection=collection, query=query,
+            persona=persona, limit=5,
+            results=[{"id": h.id, "cosine": h.score,
+                      "adjusted": h.score * salience.multiplier(h.payload or {}, now_epoch)}
+                     for h in ranked])
     except Exception as e:
         print(colored(f"Error searching collection: {e}", "red"))
         return

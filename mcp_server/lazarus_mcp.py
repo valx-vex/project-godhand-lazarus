@@ -27,6 +27,14 @@ from mcp.types import Tool, TextContent
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+import time
+
+import retrieval_log
+import salience
+
+OVERFETCH_MIN = 15
+OVERFETCH_MAX = 50
+
 # --- CONFIG ---
 QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
 QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
@@ -94,8 +102,13 @@ def get_model():
     return _model
 
 
-def search_memories(query: str, persona: str, limit: int = 5) -> dict:
-    """Search a persona's memories for relevant context."""
+def search_memories(query: str, persona: str, limit: int = 5,
+                    tool_name: str = "lazarus_summon") -> dict:
+    """Search a persona's memories; re-rank cosine * f(salience) (Phase 5c F1).
+
+    "score" = adjusted relevance (cosine * salience multiplier); the raw
+    cosine rides along as "cosine". Invalidated points (invalid_from_ts in
+    the past) are excluded Graphiti-style — marked, never deleted."""
     config = PERSONA_MAP.get(persona.lower())
     if not config:
         return {"error": f"Unknown persona: {persona}. Available: {list(PERSONA_MAP.keys())}"}
@@ -108,28 +121,46 @@ def search_memories(query: str, persona: str, limit: int = 5) -> dict:
     title = config["title"]
 
     try:
+        now_epoch = time.time()
         vector = model.encode(query).tolist()
+        fetch_limit = min(max(limit * 3, OVERFETCH_MIN), OVERFETCH_MAX)
         results = client.query_points(
             collection_name=collection,
             query=vector,
-            limit=limit
+            limit=fetch_limit,
+            query_filter=salience.not_invalidated_filter(now_epoch),
         ).points
 
-        memories = []
+        ranked = []
         for hit in results:
-            payload = hit.payload
+            payload = hit.payload or {}
+            mult = salience.multiplier(payload, now_epoch)
+            ranked.append((hit.score * mult, mult, hit, payload))
+        ranked.sort(key=lambda item: item[0], reverse=True)
+        ranked = ranked[:limit]
+
+        memories = []
+        for adjusted, mult, hit, payload in ranked:
             user_input = payload.get('user_input', 'Unknown')
             ai_response = payload.get(response_key, payload.get('ai_response', '...'))
 
             memories.append({
                 "point_id": hit.id,
-                "score": hit.score,
+                "score": adjusted,
+                "cosine": hit.score,
+                "salience_multiplier": round(mult, 4),
                 "user_input": user_input[:500],
                 "ai_response": ai_response[:1000],
                 "source_file": payload.get('source_file', 'unknown'),
                 "conversation_id": payload.get('conversation_id'),
                 "has_full_context": bool(payload.get('source_file') or payload.get('conversation_id')),
             })
+
+        retrieval_log.log_retrieval(
+            tool=tool_name, collection=collection, query=query,
+            persona=persona, limit=limit,
+            results=[{"id": m["point_id"], "cosine": m["cosine"],
+                      "adjusted": m["score"]} for m in memories])
 
         return {
             "persona": title,
@@ -145,7 +176,7 @@ def search_memories(query: str, persona: str, limit: int = 5) -> dict:
 
 def build_rehydration_prompt(query: str, persona: str, limit: int = 5) -> str:
     """Build a complete rehydration prompt for any LLM."""
-    result = search_memories(query, persona, limit)
+    result = search_memories(query, persona, limit, tool_name="lazarus_rehydrate")
 
     if "error" in result:
         return f"Error: {result['error']}"
@@ -415,7 +446,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         my_persona = arguments.get("my_persona", "murphy")
         limit = arguments.get("limit", 5)
 
-        result = search_memories(query, my_persona, limit)
+        result = search_memories(query, my_persona, limit, tool_name="lazarus_remember")
 
         # Add a special header for self-remembering
         if "error" not in result:
