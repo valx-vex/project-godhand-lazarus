@@ -21,6 +21,7 @@ from qdrant_client.models import PointStruct
 from sentence_transformers import SentenceTransformer
 from ingest_eras import configured_murphy_era
 from ingest_ids import memory_point_id
+from salience import created_at_from_source
 
 # --- CONFIGURATION ---
 _DEFAULT_DIRS = [
@@ -69,6 +70,7 @@ def parse_journal(file_path: Path) -> Generator[Dict[str, Any], None, None]:
                         "user_input": user,
                         "ai_response": assistant,
                         "source_file": str(file_path),
+                        "ts": str(rec.get("ts") or ""),
                     }
     except OSError as e:
         print(f"⚠️ Error parsing {file_path}: {e}")
@@ -105,6 +107,9 @@ def process_sessions() -> None:
                 "full_text": combined_text,
                 "harness": "hermes",
             }
+            created = pair.get("ts") or created_at_from_source(pair["source_file"])
+            if created:
+                payload["created_at"] = created
             point_id = memory_point_id(pair["source_file"], user_input, ai_response)
             points.append(PointStruct(id=point_id, vector=vector, payload=payload))
             if len(points) >= BATCH_SIZE:

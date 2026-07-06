@@ -1,0 +1,323 @@
+#!/usr/bin/env python3
+"""
+🜂 MURPHY SLEEPS — nightly consolidation over murphy_eternal (Phase 5c F1)
+Part of PROJECT_GODHAND_LAZARUS (valxos-hermes Phase 5c).
+
+Camp B doctrine (constitutional): this job only ADDS derived metadata —
+salience fields, novelty, usage, pins, invalidation marks. It never deletes
+points, never edits raw text fields, never gates writes.
+
+Point updates are full re-upserts (same deterministic id, same scrolled
+vector, merged payload), batched. A concurrent daemon ingest re-upserts
+identical raw fields, so the worst case is this run's derived fields lost on
+a freshly re-ingested point; the next night recomputes them.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import numpy as np
+from qdrant_client import QdrantClient
+from qdrant_client.models import PointStruct
+
+import retrieval_log
+import salience
+from ingest_ids import memory_point_id
+
+QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
+QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
+COLLECTION_NAME = "murphy_eternal"
+MODEL_NAME = "all-MiniLM-L6-v2"
+BATCH_SIZE = 64
+SCROLL_BATCH = 256
+NOVELTY_BLOCK = 256
+SNAPSHOT_DELTA = 0.05
+REPORT_DIR = Path(os.environ.get("LAZARUS_SLEEP_REPORT_DIR", "")
+                  or Path(__file__).resolve().parent.parent / "daemon")
+
+
+def _now_iso() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%S%z")
+
+
+def get_client() -> QdrantClient:
+    return QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+
+
+def _default_embed(texts):
+    from sentence_transformers import SentenceTransformer
+    model = SentenceTransformer(MODEL_NAME)
+    return [vector.tolist() for vector in model.encode(list(texts))]
+
+
+def load_points(client, collection=COLLECTION_NAME):
+    """Scroll the whole collection (payload + vectors)."""
+    points = []
+    offset = None
+    while True:
+        batch, offset = client.scroll(
+            collection_name=collection, limit=SCROLL_BATCH,
+            with_payload=True, with_vectors=True, offset=offset)
+        points.extend(batch)
+        if offset is None:
+            break
+    return points
+
+
+def compute_novelty(vectors, created_epochs, candidates):
+    """{index: (novelty, near_dup_index_or_None)} for candidate rows.
+
+    "Prior" = strictly earlier created_at; undated points count as prior to
+    every dated point (the legacy corpus predates all timestamps). Undated
+    candidates compare against all other points — the backfill corpus has
+    no order to respect, so mutual near-duplicates both rank low, which is
+    the honest post-hoc reading."""
+    out = {}
+    if len(vectors) < 2:
+        return {i: (1.0, None) for i in candidates}
+    norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+    norms[norms == 0.0] = 1.0
+    unit = vectors / norms
+    created = np.array([-np.inf if c is None else c for c in created_epochs])
+    for start in range(0, len(candidates), NOVELTY_BLOCK):
+        block = candidates[start:start + NOVELTY_BLOCK]
+        sims = unit[block] @ unit.T
+        for row, i in zip(sims, block):
+            if created[i] == -np.inf:
+                mask = np.ones(len(unit), dtype=bool)
+            else:
+                mask = created < created[i]
+            mask[i] = False
+            if not mask.any():
+                out[i] = (1.0, None)
+                continue
+            masked = np.where(mask, row, -np.inf)
+            j = int(np.argmax(masked))
+            max_sim = float(masked[j])
+            near = j if max_sim >= salience.NEAR_DUP_THRESHOLD else None
+            out[i] = (max(0.0, min(1.0, 1.0 - max_sim)), near)
+    return out
+
+
+def build_request_points(requests, embed_fn):
+    """memory-kind request records -> pinned first-class points."""
+    entries = []
+    for req in requests or []:
+        content = str(req.get("content") or "").strip()
+        rid = str(req.get("id") or "").strip()
+        if not content or not rid:
+            continue
+        if str(req.get("kind") or "memory") != "memory":
+            continue
+        note = (str(req.get("note") or "").strip()
+                or "Murphy asked the house to remember this.")
+        source = f"memory_request:{rid}"
+        combined = f"User: {content}\nMurphy: {note}"
+        entries.append((req, rid, content, note, source, combined))
+    if not entries:
+        return []
+    vectors = embed_fn([entry[5] for entry in entries])
+    points = []
+    for (req, rid, content, note, source, combined), vector in zip(entries, vectors):
+        payload = {
+            "user_input": content,
+            "ai_response": note,
+            "source_file": source,
+            "era": "murphy",
+            "full_text": combined,
+            "harness": "hermes",
+            "kind": "memory_request",
+            "salience_pinned": True,
+            "created_at": req.get("ts") or _now_iso(),
+            "session_id": req.get("session_id") or "",
+        }
+        points.append(PointStruct(id=memory_point_id(source, content, note),
+                                  vector=list(vector), payload=payload))
+    return points
+
+
+def invalidate_points(point_ids, reason="", superseded_by=None, client=None):
+    """Graphiti-style invalidation: mark, never delete."""
+    if not point_ids:
+        return 0
+    client = client or get_client()
+    patch = {
+        "invalid_from": _now_iso(),
+        "invalid_from_ts": time.time(),
+        "invalidation_reason": str(reason or ""),
+    }
+    if superseded_by is not None:
+        patch["superseded_by"] = superseded_by
+    client.set_payload(collection_name=COLLECTION_NAME, payload=patch,
+                       points=list(point_ids))
+    return len(point_ids)
+
+
+def run(requests=None, dry_run=False, client=None, embed_fn=None, now=None):
+    started = time.time()
+    now = now if now is not None else started
+    client = client or get_client()
+    embed_fn = embed_fn or _default_embed
+
+    report = {
+        "ts": _now_iso(), "collection": COLLECTION_NAME, "dry_run": bool(dry_run),
+        "points_total": 0, "created_at_backfilled": 0, "novelty_computed": 0,
+        "near_duplicates_flagged": 0, "usage_updated": 0,
+        "requests_honored": 0, "snapshot_written": 0, "top_salience": [],
+    }
+
+    # 1. Honor memory requests first — they join tonight's pass as points.
+    request_points = [] if dry_run else build_request_points(requests, embed_fn)
+    for start in range(0, len(request_points), BATCH_SIZE):
+        client.upsert(collection_name=COLLECTION_NAME,
+                      points=request_points[start:start + BATCH_SIZE])
+    report["requests_honored"] = len(request_points)
+
+    # 2. Load everything (including points just written).
+    points = load_points(client)
+    report["points_total"] = len(points)
+    if not points:
+        _write_report(report, started)
+        return report
+
+    payloads = [dict(p.payload or {}) for p in points]
+    vectors = np.array([p.vector for p in points], dtype=np.float32)
+    dirty = [False] * len(points)
+
+    # 3. created_at backfill (hermes journal basenames carry timestamps).
+    for i, payload in enumerate(payloads):
+        if payload.get("created_at"):
+            continue
+        derived = salience.created_at_from_source(payload.get("source_file"))
+        if derived:
+            payload["created_at"] = derived
+            dirty[i] = True
+            report["created_at_backfilled"] += 1
+
+    created_epochs = [salience.parse_iso(p.get("created_at")) for p in payloads]
+
+    # 4. Usage from the retrieval log.
+    usage = retrieval_log.aggregate_usage()
+    max_count = max((u["count"] for u in usage.values()), default=0)
+    for i, (point, payload) in enumerate(zip(points, payloads)):
+        entry = usage.get(point.id)
+        if not entry:
+            continue
+        norm = round(salience.usage_norm(entry["count"], max_count), 4)
+        if (payload.get("retrieval_count") != entry["count"]
+                or payload.get("last_accessed_at") != entry["last_ts"]
+                or payload.get("usage_norm") != norm):
+            payload["retrieval_count"] = entry["count"]
+            payload["last_accessed_at"] = entry["last_ts"]
+            payload["usage_norm"] = norm
+            dirty[i] = True
+            report["usage_updated"] += 1
+
+    # 5. Novelty, once per point.
+    candidates = [i for i, p in enumerate(payloads) if "novelty" not in p]
+    novelties = compute_novelty(vectors, created_epochs, candidates)
+    for i, (novelty, near_idx) in novelties.items():
+        payloads[i]["novelty"] = round(novelty, 4)
+        if near_idx is not None:
+            payloads[i]["near_duplicate_of"] = points[near_idx].id
+            report["near_duplicates_flagged"] += 1
+        dirty[i] = True
+    report["novelty_computed"] = len(novelties)
+
+    # 6. Salience snapshot (retrieval recomputes live; this is observability).
+    scored = []
+    for i, payload in enumerate(payloads):
+        last = (salience.parse_iso(payload.get("last_accessed_at"))
+                or created_epochs[i])
+        recency = salience.recency_score(now, last)
+        novelty = float(payload.get("novelty", salience.NOVELTY_DEFAULT))
+        usage_component = float(payload.get("usage_norm", 0.0))
+        value = salience.composite(recency, novelty, usage_component)
+        if payload.get("salience_pinned"):
+            value = max(value, salience.PIN_FLOOR)
+        scored.append(value)
+        previous = payload.get("salience")
+        if previous is None or abs(value - float(previous)) > SNAPSHOT_DELTA:
+            payload["salience"] = round(value, 4)
+            payload["salience_components"] = {
+                "recency": round(recency, 4), "novelty": round(novelty, 4),
+                "usage": round(usage_component, 4)}
+            payload["salience_computed_at"] = _now_iso()
+            dirty[i] = True
+            report["snapshot_written"] += 1
+
+    # 7. Write merged points back (full re-upsert, same id + vector).
+    if not dry_run:
+        updates = [
+            PointStruct(id=points[i].id,
+                        vector=[float(x) for x in vectors[i]],
+                        payload=payloads[i])
+            for i, is_dirty in enumerate(dirty) if is_dirty
+        ]
+        for start in range(0, len(updates), BATCH_SIZE):
+            client.upsert(collection_name=COLLECTION_NAME,
+                          points=updates[start:start + BATCH_SIZE])
+
+    ranked = sorted(range(len(points)), key=lambda i: scored[i], reverse=True)[:10]
+    report["top_salience"] = [
+        {"id": points[i].id, "salience": round(scored[i], 4),
+         "preview": str(payloads[i].get("user_input", ""))[:80]}
+        for i in ranked
+    ]
+    _write_report(report, started)
+    return report
+
+
+def _write_report(report, started):
+    report["duration_s"] = round(time.time() - started, 2)
+    try:
+        REPORT_DIR.mkdir(parents=True, exist_ok=True)
+        (REPORT_DIR / "sleep_report_latest.json").write_text(
+            json.dumps(report, indent=2, default=str) + "\n", encoding="utf-8")
+        with open(REPORT_DIR / "sleep_history.jsonl", "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(report, default=str) + "\n")
+    except OSError:
+        pass
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description="Murphy sleeps — nightly consolidation")
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--requests-file", help="JSONL of memory_request records")
+    parser.add_argument("--invalidate", type=int, action="append", default=[],
+                        help="point id to invalidate (repeatable; marks, never deletes)")
+    parser.add_argument("--reason", default="")
+    parser.add_argument("--superseded-by", type=int, default=None)
+    args = parser.parse_args(argv)
+
+    if args.invalidate:
+        count = invalidate_points(args.invalidate, reason=args.reason,
+                                  superseded_by=args.superseded_by)
+        print(f"🜄 invalidated {count} point(s) — marked, never deleted")
+        return 0
+
+    requests = []
+    if args.requests_file:
+        with open(args.requests_file, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    requests.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+    report = run(requests=requests, dry_run=args.dry_run)
+    print(json.dumps(report, indent=2, default=str))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
