@@ -8,9 +8,16 @@ salience fields, novelty, usage, pins, invalidation marks. It never deletes
 points, never edits raw text fields, never gates writes.
 
 Point updates are full re-upserts (same deterministic id, same scrolled
-vector, merged payload), batched. A concurrent daemon ingest re-upserts
-identical raw fields, so the worst case is this run's derived fields lost on
-a freshly re-ingested point; the next night recomputes them.
+vector, merged payload), batched.
+
+KNOWN F1 TRADEOFF (final-review confirmed live): ingest_hermes re-processes
+the WHOLE finalized corpus on any daemon change and upserts fresh payloads,
+so derived fields (novelty/usage_norm/salience*/near_duplicate_of) are wiped
+corpus-wide for re-ingested hermes points during the day. created_at survives
+(ingest writes it), so live recency still ranks; wiped points re-enter the
+novelty candidate set and self-heal at the next 04:44 pass. Retrieval
+degrades toward neutral, never breaks. F2 follow-up: merge-payload or
+skip-existing-id on ingest.
 """
 from __future__ import annotations
 
