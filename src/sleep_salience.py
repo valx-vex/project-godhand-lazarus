@@ -288,8 +288,10 @@ def _write_report(report, started):
     report["duration_s"] = round(time.time() - started, 2)
     try:
         REPORT_DIR.mkdir(parents=True, exist_ok=True)
-        (REPORT_DIR / "sleep_report_latest.json").write_text(
-            json.dumps(report, indent=2, default=str) + "\n", encoding="utf-8")
+        latest = f"sleep_report_latest_{report.get('collection', 'unknown')}.json"
+        for name in ("sleep_report_latest.json", latest):
+            (REPORT_DIR / name).write_text(
+                json.dumps(report, indent=2, default=str) + "\n", encoding="utf-8")
         with open(REPORT_DIR / "sleep_history.jsonl", "a", encoding="utf-8") as fh:
             fh.write(json.dumps(report, default=str) + "\n")
     except OSError:
