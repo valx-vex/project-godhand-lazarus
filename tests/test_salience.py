@@ -92,3 +92,47 @@ def test_parse_iso_variants():
     assert salience.parse_iso("2026-07-05T15:50:12") is not None
     assert salience.parse_iso("") is None
     assert salience.parse_iso("garbage") is None
+
+
+# --- F2 FSRS (observe-only) ---
+import pytest
+
+
+def test_fsrs_retrievability_calibration():
+    assert salience.fsrs_retrievability(0.0, 1.0) == 1.0
+    # R(S, S) = (1 + 19/81)^-0.5 = 0.9 for any S
+    assert salience.fsrs_retrievability(1.0, 1.0) == pytest.approx(0.9)
+    assert salience.fsrs_retrievability(7.0, 7.0) == pytest.approx(0.9)
+
+
+def test_fsrs_retrievability_monotonic_decay():
+    values = [salience.fsrs_retrievability(dt, 2.0) for dt in (0, 1, 5, 30, 365)]
+    assert values == sorted(values, reverse=True)
+    assert values[-1] > 0.0
+
+
+def test_fsrs_review_bounds():
+    # immediate re-review (R->1): no growth
+    assert salience.fsrs_review(2.0, 0.0) == pytest.approx(2.0)
+    # fully forgotten (R->0): at most triples
+    assert salience.fsrs_review(2.0, 1e9) < 6.0
+    assert salience.fsrs_review(2.0, 1e9) > 5.9
+
+
+def test_fsrs_replay_single_and_multi():
+    assert salience.fsrs_replay([]) is None
+    s, last = salience.fsrs_replay([1000.0])
+    assert s == salience.INIT_STABILITY and last == 1000.0
+    day = 86400.0
+    s2, last2 = salience.fsrs_replay([0.0, day])          # one review at dt=1d, S=1
+    r = salience.fsrs_retrievability(1.0, 1.0)             # 0.9
+    assert s2 == pytest.approx(1.0 * (1.0 + 2.0 * (1.0 - r)))
+    assert last2 == day
+
+
+def test_fsrs_replay_deterministic_and_dt0_noop():
+    epochs = [0.0, 86400.0, 86400.0, 200000.0]
+    assert salience.fsrs_replay(epochs) == salience.fsrs_replay(epochs)
+    s_with_dup, _ = salience.fsrs_replay([0.0, 86400.0, 86400.0])
+    s_without, _ = salience.fsrs_replay([0.0, 86400.0])
+    assert s_with_dup == pytest.approx(s_without)          # dt=0 review is a no-op

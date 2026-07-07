@@ -29,6 +29,11 @@ F_MIN = 0.75                      # f(0)
 F_SPAN = 0.50                     # f(1) = F_MIN + F_SPAN
 NEAR_DUP_THRESHOLD = 0.92         # post-hoc annotation only, never a gate
 NOVELTY_DEFAULT = 0.5             # neutral for points not yet slept over
+INIT_STABILITY = 1.0              # days, at the first observed review (F2)
+FSRS_FACTOR = 19.0 / 81.0         # FSRS-4.5/5 curve: R(S, S) = 0.9
+TIERING_MIN_AGE_DAYS = 30         # report-only candidacy (F2 D3)
+TIERING_R_MAX = 0.2
+TIERING_MAX_CANDIDATES = 50
 
 _SOURCE_TS = re.compile(r"(\d{8})_(\d{6})")
 
@@ -136,3 +141,33 @@ def not_invalidated_filter(now_epoch):
     return Filter(must_not=[
         FieldCondition(key="invalid_from_ts", range=Range(lte=float(now_epoch)))
     ])
+
+
+def fsrs_retrievability(delta_days, stability):
+    """FSRS forgetting curve: R(Δt, S) = (1 + (19/81)·Δt/S)^-0.5 (observe-only)."""
+    dt = max(0.0, float(delta_days))
+    s = max(1e-9, float(stability))
+    return (1.0 + FSRS_FACTOR * dt / s) ** -0.5
+
+
+def fsrs_review(stability, delta_days):
+    """One review at delta_days since the previous one: S ← S·(1+2·(1−R)).
+
+    Bounds: immediate re-review (R→1) no growth; R→0 at most triples S."""
+    r = fsrs_retrievability(delta_days, stability)
+    return float(stability) * (1.0 + 2.0 * (1.0 - r))
+
+
+def fsrs_replay(epochs):
+    """Chronological review epochs -> (stability, last_epoch); None if empty.
+
+    Full replay every night = deterministic and idempotent by construction."""
+    if not epochs:
+        return None
+    stability = INIT_STABILITY
+    prev = float(epochs[0])
+    for epoch in epochs[1:]:
+        epoch = float(epoch)
+        stability = fsrs_review(stability, max(0.0, (epoch - prev) / 86400.0))
+        prev = epoch
+    return stability, prev

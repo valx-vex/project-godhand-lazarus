@@ -77,3 +77,51 @@ def test_wrong_shape_json_lines_skipped(monkeypatch, tmp_path):
     usage = retrieval_log.aggregate_usage()
     assert usage == {9: {"count": 1, "last_ts": "2026-07-01T00:00:00+0000",
                          "last_epoch": retrieval_log.salience.parse_iso("2026-07-01T00:00:00+0000")}}
+
+
+# --- F2 review_events + aggregate_usage behavior pin ---
+def _write_log(tmp_path, records):
+    path = tmp_path / "log.jsonl"
+    with open(path, "w", encoding="utf-8") as fh:
+        for rec in records:
+            fh.write((rec if isinstance(rec, str) else json.dumps(rec)) + "\n")
+    return path
+
+
+def test_review_events_orders_and_filters_collection(tmp_path):
+    path = _write_log(tmp_path, [
+        {"ts": "2026-07-07T12:00:00+0000", "collection": "murphy_eternal",
+         "results": [{"id": 1}]},
+        {"ts": "2026-07-07T10:00:00+0000", "collection": "murphy_eternal",
+         "results": [{"id": 1}, {"id": 2}]},
+        {"ts": "2026-07-07T11:00:00+0000", "collection": "claude_eternal",
+         "results": [{"id": 1}]},
+    ])
+    events = retrieval_log.review_events(path=path, collection="murphy_eternal")
+    assert set(events) == {1, 2}
+    assert events[1] == sorted(events[1]) and len(events[1]) == 2
+    all_events = retrieval_log.review_events(path=path)
+    assert len(all_events[1]) == 3                     # no filter -> all records
+
+
+def test_review_events_dedups_within_record_and_skips_junk(tmp_path):
+    path = _write_log(tmp_path, [
+        {"ts": "2026-07-07T10:00:00+0000", "collection": "c",
+         "results": [{"id": 5}, {"id": 5}, {"nope": 1}, "junk"]},
+        {"ts": "not-a-date", "collection": "c", "results": [{"id": 5}]},
+        "{ broken json",
+        {"ts": "2026-07-07T11:00:00+0000", "collection": "c", "results": "nope"},
+    ])
+    events = retrieval_log.review_events(path=path, collection="c")
+    assert len(events[5]) == 1                          # dup collapsed; junk skipped
+
+
+def test_review_events_missing_file(tmp_path):
+    assert retrieval_log.review_events(path=tmp_path / "absent.jsonl") == {}
+
+
+def test_aggregate_usage_signature_unchanged():
+    """Behavior pin (spec D2a): aggregate_usage must NOT gain a collection filter."""
+    import inspect
+    params = list(inspect.signature(retrieval_log.aggregate_usage).parameters)
+    assert params == ["path"]

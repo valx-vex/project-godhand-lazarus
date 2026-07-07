@@ -87,3 +87,48 @@ def aggregate_usage(path=None):
     except OSError:
         return usage
     return usage
+
+
+def review_events(path=None, collection=None):
+    """{point_id: [epoch, ...] chronologically sorted} for FSRS replay (F2).
+
+    Filtered by record["collection"] when given. Records with unparseable ts
+    are skipped (they cannot order a replay); duplicate ids within one record
+    count once; malformed lines tolerated like aggregate_usage. Feeds ONLY
+    observe-only fields — never the live ranking path."""
+    target = Path(path) if path else log_path()
+    events = {}
+    try:
+        with open(target, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(record, dict):
+                    continue
+                if collection is not None and record.get("collection") != collection:
+                    continue
+                epoch = salience.parse_iso(record.get("ts"))
+                if epoch is None:
+                    continue
+                results = record.get("results")
+                if not isinstance(results, list):
+                    continue
+                seen = set()
+                for result in results:
+                    if not isinstance(result, dict):
+                        continue
+                    pid = result.get("id")
+                    if pid is None or pid in seen:
+                        continue
+                    seen.add(pid)
+                    events.setdefault(pid, []).append(epoch)
+    except OSError:
+        return events
+    for pid in events:
+        events[pid].sort()
+    return events
