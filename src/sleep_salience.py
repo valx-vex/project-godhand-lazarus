@@ -10,14 +10,11 @@ points, never edits raw text fields, never gates writes.
 Point updates are full re-upserts (same deterministic id, same scrolled
 vector, merged payload), batched.
 
-KNOWN F1 TRADEOFF (final-review confirmed live): ingest_hermes re-processes
-the WHOLE finalized corpus on any daemon change and upserts fresh payloads,
-so derived fields (novelty/usage_norm/salience*/near_duplicate_of) are wiped
-corpus-wide for re-ingested hermes points during the day. created_at survives
-(ingest writes it), so live recency still ranks; wiped points re-enter the
-novelty candidate set and self-heal at the next 04:44 pass. Retrieval
-degrades toward neutral, never breaks. F2 follow-up: merge-payload or
-skip-existing-id on ingest.
+F2 (2026-07-07): the daytime wipe is FIXED — ingesters skip existing ids
+(fail-closed; see src/ingest_skip.py) so derived fields survive by
+construction, and invalidation marks additionally self-heal from the
+append-only ledger (daemon/invalidations.jsonl) re-applied every pass.
+FSRS retrievability + tiering candidates are observe-only additions.
 """
 from __future__ import annotations
 
@@ -148,6 +145,57 @@ def _fsrs_pass(points, payloads, dirty, report, collection, now):
     return fresh
 
 
+def _tiering_pass(points, payloads, scored, created_epochs, fsrs_fresh,
+                  report, now):
+    """Report-only cold-storage candidates (F2 D3). Writes NOTHING to points.
+
+    Uses FRESH in-pass values (scored, fsrs_fresh) — not the delta-guard-stale
+    payload copies. Undated points are counted, never listed: age unknown ≠
+    old, and the undated set is the founding legacy corpus."""
+    rows = []
+    undated = 0
+    for i, payload in enumerate(payloads):
+        if payload.get("salience_pinned") or payload.get("kind") == "memory_request":
+            continue
+        inv = payload.get("invalid_from_ts")
+        try:
+            if inv is not None and float(inv) <= now:
+                continue
+        except (TypeError, ValueError):
+            pass
+        try:
+            retrievals = int(payload.get("retrieval_count") or 0)
+        except (TypeError, ValueError):
+            retrievals = 0
+        reason = None
+        if i in fsrs_fresh and fsrs_fresh[i] < salience.TIERING_R_MAX:
+            reason = "forgotten"
+        elif retrievals <= 0:
+            if created_epochs[i] is None:
+                undated += 1
+                continue
+            if (now - created_epochs[i]) / 86400.0 > salience.TIERING_MIN_AGE_DAYS:
+                reason = "never_used"
+        if reason is None:
+            continue
+        rows.append((scored[i], created_epochs[i] or 0.0, i, reason, retrievals))
+    rows.sort(key=lambda row: (row[0], row[1]))
+    report["tiering_candidates_total"] = len(rows)
+    report["tiering_undated_excluded"] = undated
+    report["tiering_candidates"] = [
+        {"id": points[i].id, "reason": reason,
+         "preview": str(payloads[i].get("user_input", ""))[:80],
+         "created_at": payloads[i].get("created_at"),
+         "retrieval_count": retrievals,
+         "stability": payloads[i].get("stability"),
+         "fsrs_retrievability": (round(fsrs_fresh[i], 4)
+                                 if i in fsrs_fresh else None),
+         "salience": round(value, 4),
+         "near_dup": "near_duplicate_of" in payloads[i]}
+        for value, _, i, reason, retrievals
+        in rows[:salience.TIERING_MAX_CANDIDATES]]
+
+
 def build_request_points(requests, embed_fn):
     """memory-kind request records -> pinned first-class points."""
     entries = []
@@ -252,6 +300,8 @@ def run(requests=None, dry_run=False, client=None, embed_fn=None, now=None,
         "near_duplicates_flagged": 0, "usage_updated": 0, "fsrs_updated": 0,
         "requests_honored": 0, "snapshot_written": 0, "top_salience": [],
         "invalidations_reapplied": 0,
+        "tiering_candidates": [], "tiering_candidates_total": 0,
+        "tiering_undated_excluded": 0,
     }
 
     # 1. Honor memory requests first — they join tonight's pass as points.
@@ -336,6 +386,10 @@ def run(requests=None, dry_run=False, client=None, embed_fn=None, now=None,
             payload["salience_computed_at"] = _now_iso()
             dirty[i] = True
             report["snapshot_written"] += 1
+
+    # 6b. Tiering candidates (report-only; F2 D3).
+    _tiering_pass(points, payloads, scored, created_epochs, fsrs_fresh,
+                  report, now)
 
     # 7. Write merged points back (full re-upsert, same id + vector).
     if not dry_run:

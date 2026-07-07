@@ -352,3 +352,89 @@ def test_dry_run_does_not_reapply(monkeypatch, tmp_path):
     sleep_salience.invalidate_points([2], reason="x", client=client)
     report = sleep_salience.run(client=client, embed_fn=fake_embed, dry_run=True)
     assert report["invalidations_reapplied"] == 0
+
+
+# --- F2 tiering candidates (report-only) ---
+def _tiering_seed():
+    """Old+cold corpus: 1=old never used; 2=old near-dup never used; 3=pinned;
+    4=invalidated; 5=recent; 6=old but undated."""
+    old = "2026-05-01T10:00:00+0000"
+    return [
+        PointStruct(id=1, vector=[1.0, 0.0, 0.0, 0.0],
+                    payload={"user_input": "old cold one", "ai_response": "r",
+                             "created_at": old, "novelty": 0.9}),
+        PointStruct(id=2, vector=[0.999, 0.032, 0.0, 0.0],
+                    payload={"user_input": "old near dup", "ai_response": "r",
+                             "created_at": old, "novelty": 0.1,
+                             "near_duplicate_of": 1}),
+        PointStruct(id=3, vector=[0.0, 1.0, 0.0, 0.0],
+                    payload={"user_input": "pinned", "ai_response": "r",
+                             "created_at": old, "salience_pinned": True}),
+        PointStruct(id=4, vector=[0.0, 0.0, 1.0, 0.0],
+                    payload={"user_input": "invalidated", "ai_response": "r",
+                             "created_at": old, "invalid_from_ts": 1.0}),
+        PointStruct(id=5, vector=[0.0, 0.0, 0.0, 1.0],
+                    payload={"user_input": "recent", "ai_response": "r",
+                             "created_at": "2026-07-04T10:00:00+0000"}),
+        PointStruct(id=6, vector=[0.5, 0.5, 0.0, 0.0],
+                    payload={"user_input": "undated legacy", "ai_response": "r"}),
+    ]
+
+
+def test_tiering_selection_rules(monkeypatch, tmp_path):
+    _ledger_env(monkeypatch, tmp_path)
+    client = make_client(_tiering_seed())
+    now = salience.parse_iso("2026-07-05T10:00:00+0000")
+    report = sleep_salience.run(client=client, embed_fn=fake_embed, now=now)
+    ids = {c["id"] for c in report["tiering_candidates"]}
+    assert ids == {1, 2}                       # old + never used, only
+    assert report["tiering_candidates_total"] == 2
+    assert report["tiering_undated_excluded"] == 1        # point 6, counted not listed
+    by_id = {c["id"]: c for c in report["tiering_candidates"]}
+    assert by_id[1]["reason"] == "never_used"
+    assert by_id[2]["near_dup"] is True
+    assert by_id[1]["near_dup"] is False
+    assert by_id[1]["preview"] == "old cold one"
+    assert isinstance(by_id[1]["salience"], float)
+
+
+def test_tiering_forgotten_reason(monkeypatch, tmp_path):
+    _ledger_env(monkeypatch, tmp_path)
+    # reviews long ago -> stability grew slightly, R decayed under 0.2 by now
+    _log_records(tmp_path, [
+        {"ts": "2026-01-01T10:00:00+0000", "collection": "murphy_eternal",
+         "results": [{"id": 1}]},
+        {"ts": "2026-01-02T10:00:00+0000", "collection": "murphy_eternal",
+         "results": [{"id": 1}]},
+    ])
+    client = make_client(_tiering_seed())
+    now = salience.parse_iso("2026-12-01T10:00:00+0000")   # ~11 months later
+    report = sleep_salience.run(client=client, embed_fn=fake_embed, now=now)
+    by_id = {c["id"]: c for c in report["tiering_candidates"]}
+    assert by_id[1]["reason"] == "forgotten"
+    assert by_id[1]["fsrs_retrievability"] < salience.TIERING_R_MAX
+    assert by_id[1]["retrieval_count"] == 2
+
+
+def test_tiering_sort_is_none_safe_and_capped(monkeypatch, tmp_path):
+    """The reviewed TypeError trap: tie-heavy fixtures with equal salience."""
+    _ledger_env(monkeypatch, tmp_path)
+    old = "2026-05-01T10:00:00+0000"
+    points = [PointStruct(id=100 + i, vector=[1.0, 0.0, 0.0, 0.0],
+                          payload={"user_input": f"clone {i}", "ai_response": "r",
+                                   "created_at": old, "novelty": 0.5})
+              for i in range(60)]
+    client = make_client(points)
+    now = salience.parse_iso("2026-07-05T10:00:00+0000")
+    report = sleep_salience.run(client=client, embed_fn=fake_embed, now=now)
+    assert report["tiering_candidates_total"] == 60
+    assert len(report["tiering_candidates"]) == salience.TIERING_MAX_CANDIDATES
+
+
+def test_tiering_computed_in_dry_run(monkeypatch, tmp_path):
+    _ledger_env(monkeypatch, tmp_path)
+    client = make_client(_tiering_seed())
+    now = salience.parse_iso("2026-07-05T10:00:00+0000")
+    report = sleep_salience.run(client=client, embed_fn=fake_embed, now=now,
+                                dry_run=True)
+    assert report["tiering_candidates_total"] == 2         # report-only = dry-safe
