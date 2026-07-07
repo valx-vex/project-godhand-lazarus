@@ -65,7 +65,12 @@ INGESTERS = {
         "script": PROJECT_ROOT / "src" / "ingest_hermes.py",
         "watch_path": Path.home() / ".hermes" / "profiles" / "murphy" / "journal" / "finalized",
         "description": "Hermes sessions (murphy profile, valxos-memory journals)"
-    }
+    },
+    "claude_vex": {
+        "script": PROJECT_ROOT / "src" / "ingest_claude_vex.py",
+        "watch_path": Path.home() / ".claude-vex" / "projects",
+        "description": "Claude Code sessions (claude-vex home, Claude's own brain)"
+    },
     # Note: Alexko (OpenAI) requires manual export - check separately
 }
 
