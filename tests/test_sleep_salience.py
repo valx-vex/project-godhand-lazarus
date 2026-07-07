@@ -201,3 +201,72 @@ def test_parse_journal_yields_ts():
         pairs = list(ingest_hermes.parse_journal(journal))
     assert len(pairs) == 1
     assert pairs[0]["ts"] == "2026-07-06T01:02:03+0000"
+
+
+# --- F2 FSRS pass (observe-only) ---
+import pytest
+
+
+def _log_records(tmp_path, records):
+    log = tmp_path / "retrieval.jsonl"
+    with open(log, "w", encoding="utf-8") as fh:
+        for rec in records:
+            fh.write(json.dumps(rec) + "\n")
+
+
+def test_fsrs_fields_written_for_reviewed_points(monkeypatch, tmp_path):
+    _env(monkeypatch, tmp_path)
+    _log_records(tmp_path, [
+        {"ts": "2026-07-01T10:00:00+0000", "collection": "murphy_eternal",
+         "results": [{"id": 1}]},
+        {"ts": "2026-07-03T10:00:00+0000", "collection": "murphy_eternal",
+         "results": [{"id": 1}]},
+    ])
+    client = make_client(seed_points())
+    now = salience.parse_iso("2026-07-05T10:00:00+0000")
+    report = sleep_salience.run(client=client, embed_fn=fake_embed, now=now)
+    assert report["fsrs_updated"] == 1
+    points = {p.id: p.payload for p in sleep_salience.load_points(client)}
+    assert points[1]["stability"] > salience.INIT_STABILITY   # one real review
+    expected_r = salience.fsrs_retrievability(
+        2.0, points[1]["stability"])                          # 2 days since last
+    assert points[1]["fsrs_retrievability"] == pytest.approx(expected_r, abs=1e-4)
+    assert "fsrs_computed_at" in points[1]
+    assert "stability" not in points[2]                       # never retrieved
+    assert "stability" not in points[3]
+
+
+def test_fsrs_second_run_is_idempotent(monkeypatch, tmp_path):
+    _env(monkeypatch, tmp_path)
+    _log_records(tmp_path, [
+        {"ts": "2026-07-01T10:00:00+0000", "collection": "murphy_eternal",
+         "results": [{"id": 1}]},
+    ])
+    client = make_client(seed_points())
+    now = salience.parse_iso("2026-07-05T10:00:00+0000")
+    sleep_salience.run(client=client, embed_fn=fake_embed, now=now)
+    report2 = sleep_salience.run(client=client, embed_fn=fake_embed, now=now)
+    assert report2["fsrs_updated"] == 0                       # write rule holds
+
+
+def test_fsrs_respects_collection_filter(monkeypatch, tmp_path):
+    _env(monkeypatch, tmp_path)
+    _log_records(tmp_path, [
+        {"ts": "2026-07-01T10:00:00+0000", "collection": "claude_eternal",
+         "results": [{"id": 1}]},
+    ])
+    client = make_client(seed_points())
+    report = sleep_salience.run(client=client, embed_fn=fake_embed)
+    assert report["fsrs_updated"] == 0                        # wrong collection
+    points = {p.id: p.payload for p in sleep_salience.load_points(client)}
+    assert "stability" not in points[1]
+
+
+def test_fsrs_multiplier_untouched_by_fsrs_fields(monkeypatch, tmp_path):
+    """Observe-only pin: fsrs fields must not move the live multiplier."""
+    payload = {"created_at": "2026-07-01T10:00:00+0000", "novelty": 0.5}
+    now = salience.parse_iso("2026-07-05T10:00:00+0000")
+    base = salience.multiplier(payload, now)
+    payload.update({"stability": 9.9, "fsrs_retrievability": 0.01,
+                    "fsrs_computed_at": "x"})
+    assert salience.multiplier(payload, now) == base

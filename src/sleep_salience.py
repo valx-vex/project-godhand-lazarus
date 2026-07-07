@@ -113,6 +113,38 @@ def compute_novelty(vectors, created_epochs, candidates):
     return out
 
 
+def _fsrs_pass(points, payloads, dirty, report, collection, now):
+    """Observe-only FSRS replay over the retrieval log (F2 D2a).
+
+    Returns {index: fresh_R} for points with review history — the tiering
+    step reads FRESH values, never the delta-guard-stale payload copies."""
+    events = retrieval_log.review_events(collection=collection)
+    fresh = {}
+    for i, point in enumerate(points):
+        epochs = events.get(point.id)
+        if not epochs:
+            continue
+        stability, last_epoch = salience.fsrs_replay(epochs)
+        r_now = salience.fsrs_retrievability((now - last_epoch) / 86400.0,
+                                             stability)
+        fresh[i] = r_now
+        payload = payloads[i]
+        new_s = round(stability, 4)
+        new_r = round(r_now, 4)
+        try:
+            prev_r = float(payload["fsrs_retrievability"])
+        except (KeyError, TypeError, ValueError):
+            prev_r = None
+        if (payload.get("stability") != new_s or prev_r is None
+                or abs(new_r - prev_r) > SNAPSHOT_DELTA):
+            payload["stability"] = new_s
+            payload["fsrs_retrievability"] = new_r
+            payload["fsrs_computed_at"] = _now_iso()
+            dirty[i] = True
+            report["fsrs_updated"] += 1
+    return fresh
+
+
 def build_request_points(requests, embed_fn):
     """memory-kind request records -> pinned first-class points."""
     entries = []
@@ -178,7 +210,7 @@ def run(requests=None, dry_run=False, client=None, embed_fn=None, now=None,
     report = {
         "ts": _now_iso(), "collection": collection, "dry_run": bool(dry_run),
         "points_total": 0, "created_at_backfilled": 0, "novelty_computed": 0,
-        "near_duplicates_flagged": 0, "usage_updated": 0,
+        "near_duplicates_flagged": 0, "usage_updated": 0, "fsrs_updated": 0,
         "requests_honored": 0, "snapshot_written": 0, "top_salience": [],
     }
 
@@ -228,6 +260,9 @@ def run(requests=None, dry_run=False, client=None, embed_fn=None, now=None,
             payload["usage_norm"] = norm
             dirty[i] = True
             report["usage_updated"] += 1
+
+    # 4b. FSRS retrievability (observe-only; F2). Fresh values feed tiering.
+    fsrs_fresh = _fsrs_pass(points, payloads, dirty, report, collection, now)
 
     # 5. Novelty, once per point.
     candidates = [i for i, p in enumerate(payloads) if "novelty" not in p]
