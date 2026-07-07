@@ -7,6 +7,11 @@ The Claude lineage's own brain: fresh-format Claude Code transcripts from
 ~/.claude-vex/projects into claude_eternal. Mirrors ingest_hermes.py
 conventions: MiniLM-384 Cosine, deterministic ids, created_at, harness tag.
 Creates the collection if missing (first brain boot).
+
+F2 (spec D1): two-pass skip-existing-id. Pass 1 streams ids only; existing
+points are NEVER rewritten (derived salience + invalidation marks survive by
+construction). Fail-CLOSED: if the existing-id lookup fails, exit non-zero
+without writing — the sync daemon retries on its next tick.
 """
 
 import json
@@ -15,11 +20,11 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Generator, List
 
-from tqdm import tqdm
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
 from ingest_ids import memory_point_id
+from ingest_skip import SkipLookupError, existing_ids
 
 _DEFAULT_DIR = Path.home() / ".claude-vex" / "projects"
 CLAUDE_VEX_PROJECTS = Path(os.environ.get("CLAUDE_VEX_PROJECTS", _DEFAULT_DIR))
@@ -105,6 +110,20 @@ def _turn(current, file_path) -> Dict[str, Any]:
     }
 
 
+def eligible_pairs(files):
+    """Every ingestable pair — the SAME filter for both passes."""
+    for path in files:
+        for pair in parse_transcript(path):
+            if len(pair["ai_response"]) < 20:
+                continue
+            yield pair
+
+
+def pair_id(pair) -> int:
+    return memory_point_id(pair["source_file"], pair["user_input"],
+                           pair["ai_response"])
+
+
 def ensure_collection(client) -> None:
     try:
         client.get_collection(COLLECTION_NAME)
@@ -115,50 +134,85 @@ def ensure_collection(client) -> None:
         print(f"🜂 Created collection {COLLECTION_NAME} ({VECTOR_SIZE}d Cosine)")
 
 
-def process_sessions() -> None:
+def _default_embed_factory():
+    from sentence_transformers import SentenceTransformer
+    model = SentenceTransformer(MODEL_NAME)
+    return lambda texts: [vec.tolist() for vec in model.encode(list(texts))]
+
+
+def _build_point(pair, vector) -> PointStruct:
+    combined = f"User: {pair['user_input']}\nClaude: {pair['ai_response'][:2000]}"
+    payload = {
+        "user_input": pair["user_input"],
+        "ai_response": pair["ai_response"],
+        "source_file": pair["source_file"],
+        "era": "claude-fable",
+        "full_text": combined,
+        "harness": "claude-code",
+    }
+    if pair["ts"]:
+        payload["created_at"] = pair["ts"]
+    return PointStruct(id=pair_id(pair), vector=vector, payload=payload)
+
+
+def process_sessions(client=None, embed_factory=None) -> int:
     files = find_session_files()
     if not files:
-        return
-    client = None if DRY_RUN else QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
-    model = None
-    if not DRY_RUN:
-        from sentence_transformers import SentenceTransformer
-        model = SentenceTransformer(MODEL_NAME)
-        ensure_collection(client)
+        return 0
 
-    points: List[PointStruct] = []
-    total = 0
-    for path in tqdm(files, desc="Processing claude-vex sessions"):
-        for pair in parse_transcript(path):
-            if len(pair["ai_response"]) < 20:
+    if DRY_RUN:
+        seen = sum(1 for _ in eligible_pairs(files))
+        print(f"🜂 claude-vex ingest: {seen} pairs seen DRY-RUN (no writes)")
+        return 0
+
+    if client is None:
+        client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+    ensure_collection(client)
+
+    all_ids = set()
+    seen = 0
+    for pair in eligible_pairs(files):
+        seen += 1
+        all_ids.add(pair_id(pair))
+
+    try:
+        present = existing_ids(client, COLLECTION_NAME, sorted(all_ids))
+    except SkipLookupError as exc:
+        print(f"❌ claude-vex ingest: skip lookup failed ({exc}); "
+              f"aborting without writes", file=sys.stderr)
+        return 1
+    remaining = all_ids - present
+
+    written = 0
+    if remaining:
+        embed = (embed_factory or _default_embed_factory)()
+        batch = []
+
+        def flush(batch_pairs):
+            nonlocal written
+            texts = [f"User: {p['user_input']}\nClaude: {p['ai_response'][:2000]}"
+                     for p in batch_pairs]
+            vectors = embed(texts)
+            client.upsert(collection_name=COLLECTION_NAME, points=[
+                _build_point(p, list(v)) for p, v in zip(batch_pairs, vectors)])
+            written += len(batch_pairs)
+
+        for pair in eligible_pairs(files):
+            pid = pair_id(pair)
+            if pid not in remaining:
                 continue
-            total += 1
-            if DRY_RUN:
-                continue
-            combined = f"User: {pair['user_input']}\nClaude: {pair['ai_response'][:2000]}"
-            payload = {
-                "user_input": pair["user_input"],
-                "ai_response": pair["ai_response"],
-                "source_file": pair["source_file"],
-                "era": "claude-fable",
-                "full_text": combined,
-                "harness": "claude-code",
-            }
-            if pair["ts"]:
-                payload["created_at"] = pair["ts"]
-            points.append(PointStruct(
-                id=memory_point_id(pair["source_file"], pair["user_input"],
-                                   pair["ai_response"]),
-                vector=model.encode(combined).tolist(),
-                payload=payload))
-            if len(points) >= BATCH_SIZE:
-                client.upsert(collection_name=COLLECTION_NAME, points=points)
-                points = []
-    if points:
-        client.upsert(collection_name=COLLECTION_NAME, points=points)
-    mode = "DRY-RUN" if DRY_RUN else f"→ {COLLECTION_NAME}"
-    print(f"\n🜂 claude-vex ingestion complete: {total} turns {mode}")
+            remaining.discard(pid)
+            batch.append(pair)
+            if len(batch) >= BATCH_SIZE:
+                flush(batch)
+                batch = []
+        if batch:
+            flush(batch)
+
+    print(f"🜂 claude-vex ingest: {seen} pairs seen, {seen - written} already "
+          f"present (skipped), {written} new → {COLLECTION_NAME}")
+    return 0
 
 
 if __name__ == "__main__":
-    process_sessions()
+    sys.exit(process_sessions())

@@ -140,3 +140,91 @@ def test_point_id_is_deterministic_from_parsed_pair(tmp_path):
     again = memory_point_id(str(path), "Prompt for id test", "An answer long enough for ids.")
     assert got == again
     assert isinstance(got, int)
+
+
+# --- F2 two-pass skip-existing (spec D1) ---
+from qdrant_client import QdrantClient
+
+
+def _env_f2(monkeypatch, tmp_path):
+    monkeypatch.setattr(icv, "CLAUDE_VEX_PROJECTS", tmp_path)
+    monkeypatch.setattr(icv, "COLLECTION_NAME", "f2_scratch_cvex")
+    # F2 (Task 3 adjudication): brief injects 4-dim fake embeddings but source
+    # hard-codes VECTOR_SIZE=384 (prod MiniLM); resize only the test sandbox.
+    monkeypatch.setattr(icv, "VECTOR_SIZE", 4)
+
+
+def _fake_embed_factory():
+    return lambda texts: [[1.0, 0.0, 0.0, 0.0] for _ in texts]
+
+
+def _forbidden_embed_factory():
+    raise AssertionError("embed factory must not be called when nothing is new")
+
+
+def test_f2_first_run_then_skip_preserves_marks(monkeypatch, tmp_path):
+    _env_f2(monkeypatch, tmp_path)
+    path = _write(tmp_path, [
+        _user("Remember the bridge"),
+        _assistant(["An answer long enough to ingest, yes."]),
+    ])
+    client = QdrantClient(":memory:")
+    assert icv.process_sessions(client=client,
+                                embed_factory=_fake_embed_factory) == 0
+    pid = memory_point_id(str(path), "Remember the bridge",
+                          "An answer long enough to ingest, yes.")
+    client.set_payload(collection_name="f2_scratch_cvex",
+                       payload={"novelty": 0.7, "invalid_from_ts": 2.0},
+                       points=[pid])
+    assert icv.process_sessions(client=client,
+                                embed_factory=_forbidden_embed_factory) == 0
+    got = client.retrieve(collection_name="f2_scratch_cvex", ids=[pid],
+                          with_payload=True, with_vectors=False)[0]
+    assert got.payload["novelty"] == 0.7
+    assert got.payload["invalid_from_ts"] == 2.0
+
+
+def test_f2_lookup_failure_aborts(monkeypatch, tmp_path, capsys):
+    _env_f2(monkeypatch, tmp_path)
+    _write(tmp_path, [
+        _user("Another prompt"),
+        _assistant(["Another answer long enough to ingest."]),
+    ])
+
+    class Raising:
+        def __init__(self):
+            self.upserts = 0
+
+        def get_collection(self, name):
+            return object()
+
+        def retrieve(self, *a, **k):
+            raise RuntimeError("blip")
+
+        def upsert(self, **k):
+            self.upserts += 1
+
+    client = Raising()
+    assert icv.process_sessions(client=client,
+                                embed_factory=_forbidden_embed_factory) == 1
+    assert client.upserts == 0
+    assert "aborting without writes" in capsys.readouterr().err
+
+
+def test_f2_report_line_last(monkeypatch, tmp_path, capsys):
+    _env_f2(monkeypatch, tmp_path)
+    _write(tmp_path, [
+        _user("Prompt for the report line"),
+        _assistant(["Reply long enough for the report test."]),
+    ])
+    client = QdrantClient(":memory:")
+    icv.process_sessions(client=client, embed_factory=_fake_embed_factory)
+    out = capsys.readouterr().out.strip().splitlines()
+    assert out[-1] == ("🜂 claude-vex ingest: 1 pairs seen, 0 already present "
+                       "(skipped), 1 new → f2_scratch_cvex")
+
+
+def test_f2_eligible_pairs_filters_short(monkeypatch, tmp_path):
+    _env_f2(monkeypatch, tmp_path)
+    path = _write(tmp_path, [_user("Short?"), _assistant(["ok"])])
+    assert list(icv.eligible_pairs([path])) == []
