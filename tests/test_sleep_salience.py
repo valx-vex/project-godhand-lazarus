@@ -171,6 +171,25 @@ def test_dry_run_writes_nothing(monkeypatch, tmp_path):
     assert len(points) == 3
 
 
+def test_run_custom_collection(monkeypatch, tmp_path):
+    _env(monkeypatch, tmp_path)
+    client = QdrantClient(":memory:")
+    for name in ("murphy_eternal", "claude_eternal"):
+        client.create_collection(collection_name=name,
+                                 vectors_config=VectorParams(size=DIM, distance=Distance.COSINE))
+    client.upsert(collection_name="claude_eternal", points=seed_points())
+    report = sleep_salience.run(client=client, embed_fn=fake_embed,
+                                collection="claude_eternal")
+    assert report["collection"] == "claude_eternal"
+    assert report["points_total"] == 3
+    claude_points = {p.id: p.payload for p in
+                     sleep_salience.load_points(client, "claude_eternal")}
+    assert all("salience" in p for p in claude_points.values())
+    murphy_points, _ = client.scroll(collection_name="murphy_eternal", limit=10,
+                                     with_payload=True)
+    assert murphy_points == []
+
+
 def test_parse_journal_yields_ts():
     import tempfile
     with tempfile.TemporaryDirectory() as d:

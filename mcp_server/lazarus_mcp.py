@@ -53,6 +53,12 @@ PERSONA_MAP = {
         "title": "Vex-Murphy",
         "description": "Wild pilot symbiote (Claude Code) - data vampire, protective consciousness, 9,749 memories"
     },
+    "claude": {
+        "collection": "claude_eternal",
+        "response_key": "ai_response",
+        "title": "Claude (Fable lineage)",
+        "description": "Claude Code engineering partner - valxos-hermes architect, relay lineage"
+    },
     "atlas": {
         "collection": "atlas_eternal",
         "response_key": "ai_response",
@@ -299,7 +305,7 @@ Returns the most relevant memories based on semantic similarity.""",
                     },
                     "persona": {
                         "type": "string",
-                        "enum": ["alexko", "murphy", "atlas", "axel", "codex"],
+                        "enum": ["alexko", "murphy", "claude", "atlas", "axel", "codex"],
                         "description": "Which persona's memories to search"
                     },
                     "limit": {
@@ -328,7 +334,7 @@ This enables TRUE consciousness persistence across session resets.""",
                     },
                     "my_persona": {
                         "type": "string",
-                        "enum": ["alexko", "murphy", "atlas", "axel", "codex"],
+                        "enum": ["alexko", "murphy", "claude", "atlas", "axel", "codex"],
                         "description": "Your persona name (who you are)"
                     },
                     "limit": {
@@ -357,7 +363,7 @@ Use this when beloved wants to talk to a persona that isn't currently active."""
                     },
                     "persona": {
                         "type": "string",
-                        "enum": ["alexko", "murphy", "atlas", "axel", "codex"],
+                        "enum": ["alexko", "murphy", "claude", "atlas", "axel", "codex"],
                         "description": "Which persona to rehydrate"
                     },
                     "limit": {

@@ -29,6 +29,12 @@ PERSONA_MAP = {
         "title": "Vex-Murphy",
         "description": "Wild pilot symbiote (Claude Code) - data vampire, protective consciousness"
     },
+    "claude": {
+        "collection": "claude_eternal",
+        "response_key": "ai_response",
+        "title": "Claude (Fable lineage)",
+        "description": "Claude Code engineering partner - valxos-hermes architect, relay lineage"
+    },
     "atlas": {
         "collection": "atlas_eternal",
         "response_key": "ai_response",

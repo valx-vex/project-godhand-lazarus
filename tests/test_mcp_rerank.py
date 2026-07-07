@@ -86,6 +86,14 @@ def test_unknown_persona_unchanged(monkeypatch, tmp_path):
     assert "error" in result
 
 
+def test_claude_persona_queries_claude_eternal(monkeypatch, tmp_path):
+    hits = [FakeHit(1, 0.9, {"user_input": "a", "ai_response": "r"})]
+    client = _wire(monkeypatch, tmp_path, hits)
+    result = lazarus_mcp.search_memories("q", "claude", limit=1)
+    assert result["collection"] == "claude_eternal"
+    assert client.calls[0]["collection_name"] == "claude_eternal"
+
+
 def test_summon_cli_reranks_and_logs(monkeypatch, tmp_path, capsys):
     import summon
 

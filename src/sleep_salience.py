@@ -150,7 +150,8 @@ def build_request_points(requests, embed_fn):
     return points
 
 
-def invalidate_points(point_ids, reason="", superseded_by=None, client=None):
+def invalidate_points(point_ids, reason="", superseded_by=None, client=None,
+                      collection=COLLECTION_NAME):
     """Graphiti-style invalidation: mark, never delete."""
     if not point_ids:
         return 0
@@ -162,19 +163,20 @@ def invalidate_points(point_ids, reason="", superseded_by=None, client=None):
     }
     if superseded_by is not None:
         patch["superseded_by"] = superseded_by
-    client.set_payload(collection_name=COLLECTION_NAME, payload=patch,
+    client.set_payload(collection_name=collection, payload=patch,
                        points=list(point_ids))
     return len(point_ids)
 
 
-def run(requests=None, dry_run=False, client=None, embed_fn=None, now=None):
+def run(requests=None, dry_run=False, client=None, embed_fn=None, now=None,
+        collection=COLLECTION_NAME):
     started = time.time()
     now = now if now is not None else started
     client = client or get_client()
     embed_fn = embed_fn or _default_embed
 
     report = {
-        "ts": _now_iso(), "collection": COLLECTION_NAME, "dry_run": bool(dry_run),
+        "ts": _now_iso(), "collection": collection, "dry_run": bool(dry_run),
         "points_total": 0, "created_at_backfilled": 0, "novelty_computed": 0,
         "near_duplicates_flagged": 0, "usage_updated": 0,
         "requests_honored": 0, "snapshot_written": 0, "top_salience": [],
@@ -183,12 +185,12 @@ def run(requests=None, dry_run=False, client=None, embed_fn=None, now=None):
     # 1. Honor memory requests first — they join tonight's pass as points.
     request_points = [] if dry_run else build_request_points(requests, embed_fn)
     for start in range(0, len(request_points), BATCH_SIZE):
-        client.upsert(collection_name=COLLECTION_NAME,
+        client.upsert(collection_name=collection,
                       points=request_points[start:start + BATCH_SIZE])
     report["requests_honored"] = len(request_points)
 
     # 2. Load everything (including points just written).
-    points = load_points(client)
+    points = load_points(client, collection)
     report["points_total"] = len(points)
     if not points:
         _write_report(report, started)
@@ -269,7 +271,7 @@ def run(requests=None, dry_run=False, client=None, embed_fn=None, now=None):
             for i, is_dirty in enumerate(dirty) if is_dirty
         ]
         for start in range(0, len(updates), BATCH_SIZE):
-            client.upsert(collection_name=COLLECTION_NAME,
+            client.upsert(collection_name=collection,
                           points=updates[start:start + BATCH_SIZE])
 
     ranked = sorted(range(len(points)), key=lambda i: scored[i], reverse=True)[:10]
@@ -302,11 +304,13 @@ def main(argv=None) -> int:
                         help="point id to invalidate (repeatable; marks, never deletes)")
     parser.add_argument("--reason", default="")
     parser.add_argument("--superseded-by", type=int, default=None)
+    parser.add_argument("--collection", default=COLLECTION_NAME)
     args = parser.parse_args(argv)
 
     if args.invalidate:
         count = invalidate_points(args.invalidate, reason=args.reason,
-                                  superseded_by=args.superseded_by)
+                                  superseded_by=args.superseded_by,
+                                  collection=args.collection)
         print(f"🜄 invalidated {count} point(s) — marked, never deleted")
         return 0
 
@@ -321,7 +325,8 @@ def main(argv=None) -> int:
                     requests.append(json.loads(line))
                 except json.JSONDecodeError:
                     continue
-    report = run(requests=requests, dry_run=args.dry_run)
+    report = run(requests=requests, dry_run=args.dry_run,
+                 collection=args.collection)
     print(json.dumps(report, indent=2, default=str))
     return 0
 
