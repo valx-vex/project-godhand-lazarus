@@ -130,6 +130,8 @@ def test_vocabulary_kind_requests_are_not_points(monkeypatch, tmp_path):
 
 def test_invalidate_marks_never_deletes(monkeypatch, tmp_path):
     _env(monkeypatch, tmp_path)
+    monkeypatch.setattr(sleep_salience, "LEDGER_PATH",
+                        tmp_path / "invalidations.jsonl")
     client = make_client(seed_points())
     sleep_salience.run(client=client, embed_fn=fake_embed)
     count = sleep_salience.invalidate_points([2], reason="superseded in test",
@@ -270,3 +272,83 @@ def test_fsrs_multiplier_untouched_by_fsrs_fields(monkeypatch, tmp_path):
     payload.update({"stability": 9.9, "fsrs_retrievability": 0.01,
                     "fsrs_computed_at": "x"})
     assert salience.multiplier(payload, now) == base
+
+
+# --- F2 invalidation ledger (self-healing marks) ---
+def _ledger_env(monkeypatch, tmp_path):
+    _env(monkeypatch, tmp_path)
+    monkeypatch.setattr(sleep_salience, "LEDGER_PATH",
+                        tmp_path / "invalidations.jsonl")
+
+
+def test_invalidate_appends_ledger_before_set_payload(monkeypatch, tmp_path):
+    _ledger_env(monkeypatch, tmp_path)
+    client = make_client(seed_points())
+    sleep_salience.invalidate_points([2], reason="test", superseded_by=1,
+                                     client=client)
+    records = [json.loads(l) for l in
+               (tmp_path / "invalidations.jsonl").read_text().splitlines()]
+    assert len(records) == 1
+    rec = records[0]
+    assert rec["collection"] == sleep_salience.COLLECTION_NAME
+    assert rec["point_ids"] == [2]
+    assert rec["patch"]["invalidation_reason"] == "test"
+    assert rec["patch"]["superseded_by"] == 1
+    assert "invalid_from_ts" in rec["patch"]
+
+
+def test_ledger_write_failure_aborts_before_qdrant(monkeypatch, tmp_path):
+    _ledger_env(monkeypatch, tmp_path)
+    monkeypatch.setattr(sleep_salience, "LEDGER_PATH",
+                        tmp_path / "no_such_dir_is_a_file" / "x.jsonl")
+    (tmp_path / "no_such_dir_is_a_file").write_text("a file, not a dir")
+
+    class MustNotWrite:
+        def set_payload(self, **k):
+            raise AssertionError("set_payload must not run when ledger fails")
+
+    import pytest as _pytest
+    with _pytest.raises(OSError):
+        sleep_salience.invalidate_points([2], reason="x", client=MustNotWrite())
+
+
+def test_sleep_reapplies_ledger_marks_after_wipe(monkeypatch, tmp_path):
+    """The self-heal: a wiped mark returns at the next pass, timestamps intact."""
+    _ledger_env(monkeypatch, tmp_path)
+    client = make_client(seed_points())
+    sleep_salience.invalidate_points([2], reason="superseded", client=client)
+    original = {p.id: p.payload for p in
+                sleep_salience.load_points(client)}[2]["invalid_from_ts"]
+    # simulate an unguarded writer wiping the point (fresh full upsert)
+    from qdrant_client.models import PointStruct as PS
+    client.upsert(collection_name=sleep_salience.COLLECTION_NAME, points=[
+        PS(id=2, vector=[0.999, 0.032, 0.0, 0.0],
+           payload={"user_input": "first again", "ai_response": "r2"})])
+    report = sleep_salience.run(client=client, embed_fn=fake_embed)
+    assert report["invalidations_reapplied"] == 1
+    healed = {p.id: p.payload for p in sleep_salience.load_points(client)}[2]
+    assert healed["invalid_from_ts"] == original          # verbatim timestamps
+    assert healed["invalidation_reason"] == "superseded"
+
+
+def test_ledger_records_filtered_by_collection_and_tolerant(monkeypatch, tmp_path):
+    _ledger_env(monkeypatch, tmp_path)
+    ledger = tmp_path / "invalidations.jsonl"
+    ledger.write_text(
+        json.dumps({"ts": "t", "collection": "other", "point_ids": [9],
+                    "patch": {"invalid_from_ts": 1.0}}) + "\n"
+        + "{ broken\n"
+        + json.dumps({"ts": "t", "collection": sleep_salience.COLLECTION_NAME,
+                      "point_ids": [2], "patch": {"invalid_from_ts": 5.0}}) + "\n"
+        + json.dumps({"ts": "t", "collection": sleep_salience.COLLECTION_NAME,
+                      "point_ids": [], "patch": {}}) + "\n")
+    records = sleep_salience._ledger_records(sleep_salience.COLLECTION_NAME)
+    assert len(records) == 1 and records[0]["point_ids"] == [2]
+
+
+def test_dry_run_does_not_reapply(monkeypatch, tmp_path):
+    _ledger_env(monkeypatch, tmp_path)
+    client = make_client(seed_points())
+    sleep_salience.invalidate_points([2], reason="x", client=client)
+    report = sleep_salience.run(client=client, embed_fn=fake_embed, dry_run=True)
+    assert report["invalidations_reapplied"] == 0

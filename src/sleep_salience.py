@@ -48,6 +48,9 @@ NOVELTY_BLOCK = 256
 SNAPSHOT_DELTA = 0.05
 REPORT_DIR = Path(os.environ.get("LAZARUS_SLEEP_REPORT_DIR", "")
                   or Path(__file__).resolve().parent.parent / "daemon")
+LEDGER_PATH = Path(os.environ.get("LAZARUS_INVALIDATION_LEDGER", "")
+                   or Path(__file__).resolve().parent.parent
+                   / "daemon" / "invalidations.jsonl")
 
 
 def _now_iso() -> str:
@@ -195,9 +198,45 @@ def invalidate_points(point_ids, reason="", superseded_by=None, client=None,
     }
     if superseded_by is not None:
         patch["superseded_by"] = superseded_by
+    _append_ledger(collection, point_ids, patch)   # ledger FIRST (F2 D2b)
     client.set_payload(collection_name=collection, payload=patch,
                        points=list(point_ids))
     return len(point_ids)
+
+
+def _append_ledger(collection, point_ids, patch):
+    """Append-only invalidation ledger (F2 D2b). Raises on failure —
+    a mark that exists only on a payload is the fragile state F2 removes."""
+    LEDGER_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(LEDGER_PATH, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps({"ts": _now_iso(), "collection": collection,
+                             "point_ids": list(point_ids), "patch": patch},
+                            default=str) + "\n")
+
+
+def _ledger_records(collection):
+    """Ledger records for one collection; malformed/foreign lines skipped."""
+    records = []
+    try:
+        with open(LEDGER_PATH, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(rec, dict) or rec.get("collection") != collection:
+                    continue
+                if not isinstance(rec.get("point_ids"), list) or not rec["point_ids"]:
+                    continue
+                if not isinstance(rec.get("patch"), dict) or not rec["patch"]:
+                    continue
+                records.append(rec)
+    except OSError:
+        return records
+    return records
 
 
 def run(requests=None, dry_run=False, client=None, embed_fn=None, now=None,
@@ -212,6 +251,7 @@ def run(requests=None, dry_run=False, client=None, embed_fn=None, now=None,
         "points_total": 0, "created_at_backfilled": 0, "novelty_computed": 0,
         "near_duplicates_flagged": 0, "usage_updated": 0, "fsrs_updated": 0,
         "requests_honored": 0, "snapshot_written": 0, "top_salience": [],
+        "invalidations_reapplied": 0,
     }
 
     # 1. Honor memory requests first — they join tonight's pass as points.
@@ -308,6 +348,17 @@ def run(requests=None, dry_run=False, client=None, embed_fn=None, now=None,
         for start in range(0, len(updates), BATCH_SIZE):
             client.upsert(collection_name=collection,
                           points=updates[start:start + BATCH_SIZE])
+
+    # 8. Re-apply the invalidation ledger (self-healing marks; F2 D2b).
+    if not dry_run:
+        for rec in _ledger_records(collection):
+            try:
+                client.set_payload(collection_name=collection,
+                                   payload=rec["patch"],
+                                   points=list(rec["point_ids"]))
+                report["invalidations_reapplied"] += len(rec["point_ids"])
+            except Exception:
+                continue  # e.g. a scratch collection's stale record
 
     ranked = sorted(range(len(points)), key=lambda i: scored[i], reverse=True)[:10]
     report["top_salience"] = [
