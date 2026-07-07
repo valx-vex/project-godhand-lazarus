@@ -122,11 +122,14 @@ def review_events(path=None, collection=None):
                 for result in results:
                     if not isinstance(result, dict):
                         continue
-                    pid = result.get("id")
-                    if pid is None or pid in seen:
+                    try:
+                        pid = result.get("id")
+                        if pid is None or pid in seen:
+                            continue
+                        seen.add(pid)
+                        events.setdefault(pid, []).append(epoch)
+                    except (TypeError, ValueError):
                         continue
-                    seen.add(pid)
-                    events.setdefault(pid, []).append(epoch)
     except OSError:
         return events
     for pid in events:

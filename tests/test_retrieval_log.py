@@ -120,6 +120,15 @@ def test_review_events_missing_file(tmp_path):
     assert retrieval_log.review_events(path=tmp_path / "absent.jsonl") == {}
 
 
+def test_review_events_tolerates_unhashable_id(tmp_path):
+    path = _write_log(tmp_path, [
+        {"ts": "2026-07-07T10:00:00+0000", "collection": "c",
+         "results": [{"id": [1, 2]}, {"id": 5}]},
+    ])
+    events = retrieval_log.review_events(path=path, collection="c")
+    assert set(events) == {5}
+
+
 def test_aggregate_usage_signature_unchanged():
     """Behavior pin (spec D2a): aggregate_usage must NOT gain a collection filter."""
     import inspect
