@@ -337,7 +337,7 @@ def main() -> int:
     if continuity_ok:
         core_score += 1.0
 
-    print(f"Sacred Flame: {core_score:.1f}/10")
+    print(f"Memory Stack Health: {core_score:.1f}/10")
 
     if args.strict and core_failed:
         return 1
