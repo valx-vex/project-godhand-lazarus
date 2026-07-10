@@ -11,6 +11,7 @@ algorithm (L4 output re-scan) — keep both in sync (see seam notes)."""
 import hashlib
 import json
 import os
+import re
 import struct
 import sys
 from collections import Counter
@@ -38,6 +39,30 @@ _SECRET_SUBSTRINGS = ("secret", "credential", ".env", ".password",
                       "id_rsa", ".pem", ".key", "keychain")
 _SHINGLE_K = 5
 _MATCH_THRESHOLD = 2
+# vm_deny.SECRET_FILE_SENTINEL mirror: a capture whose result is this sentinel
+# is a secret_file hit — ALL its args are withheld from the digest (/feed parity).
+_SECRET_FILE_SENTINEL = "<REDACTED: secret_file>"
+# vm_deny._SECRET_SPANS mirror — keep byte-in-lockstep (T13 rule; twin lockstep
+# tests pin the literals on both sides). Merge-blocker fix wf_2e4eaac7: key
+# material in ANY arg/intent must never reach the persisted payload.
+_SECRET_SPANS = [
+    re.compile(r"-----BEGIN[A-Z ]*KEY-----.*?-----END[A-Z ]*KEY-----", re.DOTALL),
+    re.compile(r"AKIA[0-9A-Z]{16}"),
+    re.compile(r"(?i)\bapi[_-]?key\b\s*[:=]\s*['\"]?[A-Za-z0-9_\-/+]{8,}['\"]?"),
+    re.compile(r"(?i)\bpassword\b\s*[:=]\s*['\"]?[^\s'\"]{4,}['\"]?"),
+    re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._\-]{8,}"),
+]
+# An arg counts as a "file touched" only when its KEY is path-like: value-shape
+# alone ('/' anywhere) classified URLs, commands and whole write_file contents
+# as paths and dumped them verbatim into the digest (the merge-blocker).
+_PATH_ARG_KEYS = ("path", "file_path", "file", "target", "source", "dest",
+                  "destination", "directory", "dir", "cwd", "filename")
+
+
+def _span_redact(text: str) -> str:
+    for pattern in _SECRET_SPANS:
+        text = pattern.sub("<REDACTED: secret_content>", text)
+    return text
 
 LAST_RUN = {"sessions": 0, "captures": 0, "redactions": 0}
 
@@ -48,7 +73,7 @@ def _redact_path(path: str) -> str:
         return "<redacted:murphy_private>"
     if any(s in low for s in _SECRET_SUBSTRINGS):
         return "<redacted:secret_file>"
-    return path
+    return _span_redact(path)   # key material embedded in a path-like value
 
 
 def _looks_like_path(value: str) -> bool:
@@ -136,22 +161,26 @@ def _summarize(records) -> dict:
         if rec.get("type") != "tool_capture":
             continue
         captures += 1
-        if "redacted" in rec or "<REDACTED" in str(rec.get("result", "")):
+        if ("redacted" in rec or "<REDACTED" in str(rec.get("result", ""))
+                or "<REDACTED" in json.dumps(rec.get("args", {}), default=str)):
             redactions += 1
         if rec.get("truncated") or rec.get("args_truncated"):
             truncated += 1
         if "redacted" in rec:                       # reduced record: no tool/args/intent
             continue
+        if str(rec.get("result", "")) == _SECRET_FILE_SENTINEL:
+            continue                # secret_file: withhold tool/args like /feed does
         tool = rec.get("tool")
         if tool:
             tool_counts[str(tool)] += 1
         intent = rec.get("intent")
-        if intent and str(intent) not in intents:
-            intents.append(str(intent))
+        if intent and _span_redact(str(intent)) not in intents:
+            intents.append(_span_redact(str(intent)))
         args = rec.get("args")
         if isinstance(args, dict):
-            for value in args.values():
-                if isinstance(value, str) and _looks_like_path(value):
+            for key, value in args.items():
+                if (key in _PATH_ARG_KEYS and isinstance(value, str)
+                        and "\n" not in value and _looks_like_path(value)):
                     files[_redact_path(value)] += 1
     top_files = [p for p, _ in sorted(files.items(), key=lambda kv: (-kv[1], kv[0]))[:10]]
     return {"tool_counts": dict(tool_counts), "files": top_files, "intents": intents,
@@ -252,7 +281,10 @@ def run(argv=None, client=None, embed_factory=None) -> int:
             text = "<redacted: murphy_private_content>"     # L4: nuke private content
             tool_counts, files, intents = {}, [], ["<redacted:murphy_private_content>"]
         else:
-            text = raw_text.replace(_PRIVATE_TOKEN, "<redacted:murphy_private>")
+            # L4 span backstop (merge-blocker fix): _summarize already builds
+            # clean fields; re-scan the OUTPUT text before embed/upsert anyway.
+            text = _span_redact(raw_text).replace(_PRIVATE_TOKEN,
+                                                  "<redacted:murphy_private>")
             tool_counts = summary["tool_counts"]
             files = summary["files"]
             intents = [i.replace(_PRIVATE_TOKEN, "<redacted:murphy_private>")

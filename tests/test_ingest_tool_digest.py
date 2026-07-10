@@ -159,6 +159,80 @@ def test_l4_fingerprint_rescan_nukes_private_content(monkeypatch, tmp_path):
     assert p["intents"] == ["<redacted:murphy_private_content>"]
 
 
+# --- merge-blocker regression (final review wf_2e4eaac7, spec §6.3/§6.4) ---
+BEARER = "AKIAABCDEFGHIJKLMNOP"
+BEARER_CMD = (f"curl -H 'Authorization: Bearer {BEARER}' "
+              "https://api.example.com/v1/complete")
+
+
+def _payload(client):
+    return client.scroll(collection_name="digest_scratch", limit=10,
+                         with_payload=True)[0][0].payload
+
+
+def test_bearer_in_command_arg_absent_from_digest(monkeypatch, tmp_path):
+    # THE merge-blocker proof: a non-path arg carrying key material must never
+    # reach the persisted payload — not full_text, not files, nowhere.
+    home = tmp_path / "hermes"; _env(monkeypatch, home)
+    _sidecar(home, "s1", [_cap(0, "bash", "2026-07-10T10:00:00+0000",
+                               args={"command": BEARER_CMD})])
+    client = QdrantClient(":memory:")
+    assert itd.run(client=client, embed_factory=fake_embed_factory) == 0
+    assert BEARER not in json.dumps(_payload(client))
+
+
+def test_content_arg_not_treated_as_file(monkeypatch, tmp_path):
+    # An arg is a "file touched" only when its KEY is path-like: content args
+    # with a '/' inside (URLs, prose) must not be dumped into the digest.
+    home = tmp_path / "hermes"; _env(monkeypatch, home)
+    secret = "OPENAI_API_KEY='sk-abc123xyz789' at https://api.openai.com/v1"
+    _sidecar(home, "s1", [_cap(0, "write_file", "2026-07-10T10:00:00+0000",
+                               args={"path": "/a/x.md", "content": secret})])
+    client = QdrantClient(":memory:")
+    assert itd.run(client=client, embed_factory=fake_embed_factory) == 0
+    p = _payload(client)
+    assert "sk-abc123xyz789" not in json.dumps(p)
+    assert "/a/x.md" in p["files"]
+
+
+def test_secret_file_capture_withholds_all_its_path_args(monkeypatch, tmp_path):
+    # Consistency with /feed (related Minor): sibling path args of a
+    # secret_file capture are withheld too, not just the name-matched path.
+    home = tmp_path / "hermes"; _env(monkeypatch, home)
+    _sidecar(home, "s1", [_cap(0, "read_file", "2026-07-10T10:00:00+0000",
+                               args={"path": "/x/prod.env", "backup": "/x/notes.md"},
+                               result="<REDACTED: secret_file>")])
+    client = QdrantClient(":memory:")
+    assert itd.run(client=client, embed_factory=fake_embed_factory) == 0
+    p = _payload(client)
+    assert p["files"] == [] and "notes.md" not in json.dumps(p)
+    assert p["redactions"] == 1
+
+
+def test_intent_key_material_span_redacted(monkeypatch, tmp_path):
+    # L4 backstop: intents are free text (/intent) and ride the payload.
+    home = tmp_path / "hermes"; _env(monkeypatch, home)
+    _sidecar(home, "s1", [_cap(0, "bash", "2026-07-10T10:00:00+0000",
+                               intent=f"redeploy with bearer {BEARER} now")])
+    client = QdrantClient(":memory:")
+    assert itd.run(client=client, embed_factory=fake_embed_factory) == 0
+    p = _payload(client)
+    assert BEARER not in json.dumps(p)
+    assert "<REDACTED: secret_content>" in json.dumps(p["intents"])
+
+
+def test_span_patterns_lockstep_with_vm_deny():
+    # Twin fixture lives in valxos tests/test_secret_args.py — the two lists
+    # must stay byte-identical (T13 lockstep rule).
+    assert [p.pattern for p in itd._SECRET_SPANS] == [
+        r"-----BEGIN[A-Z ]*KEY-----.*?-----END[A-Z ]*KEY-----",
+        r"AKIA[0-9A-Z]{16}",
+        r"(?i)\bapi[_-]?key\b\s*[:=]\s*['\"]?[A-Za-z0-9_\-/+]{8,}['\"]?",
+        r"(?i)\bpassword\b\s*[:=]\s*['\"]?[^\s'\"]{4,}['\"]?",
+        r"(?i)\bbearer\s+[A-Za-z0-9._\-]{8,}",
+    ]
+
+
 def test_report_line_is_last_stdout(monkeypatch, tmp_path, capsys):
     home = tmp_path / "hermes"; _env(monkeypatch, home)
     _sidecar(home, "s1", [_cap(0, "read", "2026-07-08T10:00:00+0000"),
