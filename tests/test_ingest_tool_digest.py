@@ -224,6 +224,7 @@ def test_intent_key_material_span_redacted(monkeypatch, tmp_path):
 def test_span_patterns_lockstep_with_vm_deny():
     # Twin fixture lives in valxos tests/test_secret_args.py — the two lists
     # must stay byte-identical (T13 lockstep rule).
+    import re
     assert [p.pattern for p in itd._SECRET_SPANS] == [
         r"-----BEGIN[A-Z ]*KEY-----.*?-----END[A-Z ]*KEY-----",
         r"AKIA[0-9A-Z]{16}",
@@ -231,6 +232,20 @@ def test_span_patterns_lockstep_with_vm_deny():
         r"(?i)\bpassword\b\s*[:=]\s*['\"]?[^\s'\"]{4,}['\"]?",
         r"(?i)\bbearer\s+[A-Za-z0-9._\-]{8,}",
     ]
+    # Flags ride the behavior too (review Minor #2): DOTALL keeps multiline
+    # PEM blocks matchable; .pattern alone would mask a dropped flag.
+    assert [(bool(p.flags & re.DOTALL), bool(p.flags & re.IGNORECASE))
+            for p in itd._SECRET_SPANS] == [
+        (True, False), (False, False), (False, True), (False, True), (False, True)]
+
+
+def test_sentinel_and_substrings_lockstep_with_vm_deny():
+    # Review Minor #1: a drifted sentinel would silently disarm the digest's
+    # sibling-path withholding; a drifted substring list would narrow C3.
+    assert itd._SECRET_FILE_SENTINEL == "<REDACTED: secret_file>"
+    assert itd._SECRET_SUBSTRINGS == (
+        "secret", "credential", ".env", ".password",
+        "id_rsa", ".pem", ".key", "keychain")
 
 
 def test_report_line_is_last_stdout(monkeypatch, tmp_path, capsys):
