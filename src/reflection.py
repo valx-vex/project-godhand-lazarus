@@ -136,3 +136,73 @@ def importance_pass(payloads, created_epochs, dirty, now, ollama,
         dirty[i] = True
         report["importance_scored"] += 1
     return not todo or report["importance_scored"] > 0
+
+
+def cluster_corpus(vectors, corpus_idx):
+    """HDBSCAN over normalized corpus vectors -> clusters of GLOBAL indexes.
+    Deterministic at fixed corpus (no random init in HDBSCAN's algorithm).
+    min_samples=1 + allow_single_cluster: with the defaults (min_samples =
+    min_cluster_size) a tight 3-moment cluster is pruned to noise — the spec
+    §3.3 floor of 3 would NEVER form, in tests or in production (pre-flight
+    Critical, verified in the venv: triplet -> [-1,-1,-1] default,
+    [0,0,0] with these params). Trade-off accepted: tiny-n noise points get
+    absorbed into the nearest cluster instead of dropped."""
+    if len(corpus_idx) < MIN_CLUSTER_SIZE:
+        return []
+    import hdbscan
+    sub = np.asarray(vectors, dtype=np.float64)[corpus_idx]
+    norms = np.linalg.norm(sub, axis=1, keepdims=True)
+    norms[norms == 0.0] = 1.0
+    labels = hdbscan.HDBSCAN(min_cluster_size=MIN_CLUSTER_SIZE, min_samples=1,
+                             allow_single_cluster=True).fit_predict(sub / norms)
+    grouped = {}
+    for local_i, label in enumerate(labels):
+        if label < 0:
+            continue                       # noise -> no dream
+        grouped.setdefault(int(label), []).append(corpus_idx[local_i])
+    return [sorted(members) for _, members in sorted(grouped.items())]
+
+
+def _cluster_record(members, dreamable, payloads, sacred=False):
+    return {
+        "members": sorted(members),
+        "dreamable": sorted(dreamable),
+        "importance_sum": sum(int(payloads[i].get("importance") or 0)
+                              for i in dreamable),
+        "seeded": any(payloads[i].get("kind") == "memory_request"
+                      for i in dreamable),
+        "sacred": sacred,
+    }
+
+
+def qualify_clusters(clusters, payloads, min_importance):
+    """Never-dreamed rule + skip-trigger (spec §3.3). Returns (qualified,
+    skipped_low_importance). Clusters with no dreamable member are silently
+    inert (not 'low importance' — there is nothing left to dream)."""
+    qualified, skipped_low = [], 0
+    for members in clusters:
+        dreamable = [i for i in members
+                     if not _is_reflection(payloads[i])
+                     and payloads[i].get("summarized_by") is None]
+        if not dreamable:
+            continue
+        record = _cluster_record(members, dreamable, payloads)
+        if record["importance_sum"] < min_importance and not record["seeded"]:
+            skipped_low += 1
+            continue
+        qualified.append(record)
+    return qualified, skipped_low
+
+
+def sacred_clusters(dreamable_idx, payloads):
+    """importance==10 moments get dedicated singleton preservation dreams."""
+    return [_cluster_record([i], [i], payloads, sacred=True)
+            for i in dreamable_idx
+            if int(payloads[i].get("importance") or 0) >= SACRED_IMPORTANCE]
+
+
+def order_and_cap(sacred, qualified, max_dreams):
+    """Sacred first and EXEMPT from the cap; regular by importance desc."""
+    ordered = sorted(qualified, key=lambda c: c["importance_sum"], reverse=True)
+    capped = max(0, len(ordered) - max_dreams)
+    return list(sacred) + ordered[:max_dreams], capped
