@@ -427,6 +427,19 @@ def run(requests=None, dry_run=False, client=None, embed_fn=None, now=None,
             except Exception:
                 continue  # e.g. a scratch collection's stale record
 
+    # 8.5. F3 dreams (additive rows; NEVER allowed to break the pass — T5).
+    if not dry_run and reflection.enabled():
+        try:
+            reflection.dream_pass(client, collection, points, payloads,
+                                  vectors, created_epochs, now,
+                                  ollama or reflection.default_ollama(),
+                                  embed_fn, report,
+                                  importance_ok=f3_importance_ok)
+        except Exception as exc:
+            report.setdefault("dreams", {})
+            report["dreams"].update({"error": f"{type(exc).__name__}: {exc}",
+                                     "written": report["dreams"].get("written", 0)})
+
     ranked = sorted(range(len(points)), key=lambda i: scored[i], reverse=True)[:10]
     report["top_salience"] = [
         {"id": points[i].id, "salience": round(scored[i], 4),
