@@ -35,6 +35,8 @@ import retrieval_log
 import salience
 from ingest_ids import memory_point_id
 
+import reflection
+
 QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
 QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
 COLLECTION_NAME = "murphy_eternal"
@@ -288,7 +290,7 @@ def _ledger_records(collection):
 
 
 def run(requests=None, dry_run=False, client=None, embed_fn=None, now=None,
-        collection=COLLECTION_NAME):
+        collection=COLLECTION_NAME, ollama_client=None):
     started = time.time()
     now = now if now is not None else started
     client = client or get_client()
@@ -353,6 +355,17 @@ def run(requests=None, dry_run=False, client=None, embed_fn=None, now=None,
 
     # 4b. FSRS retrievability (observe-only; F2). Fresh values feed tiering.
     fsrs_fresh = _fsrs_pass(points, payloads, dirty, report, collection, now)
+
+    # 4c. F3 importance (observe-only — skip-trigger fuel, NEVER composite).
+    ollama = None
+    f3_importance_ok = False
+    if not dry_run and reflection.enabled():
+        try:
+            ollama = ollama_client or reflection.default_ollama()
+            f3_importance_ok = reflection.importance_pass(
+                payloads, created_epochs, dirty, now, ollama, report, collection)
+        except Exception as exc:                      # never break the pass
+            report["importance_error"] = f"{type(exc).__name__}: {exc}"
 
     # 5. Novelty, once per point.
     candidates = [i for i, p in enumerate(payloads) if "novelty" not in p]
