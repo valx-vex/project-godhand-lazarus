@@ -29,7 +29,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 _SCRATCH = re.compile(r"^scratch_[a-z0-9_]+$")
-_LIVE = ("murphy_eternal", "claude_eternal")
+_LIVE = ("murphy_eternal", "claude_eternal", "vault_eternal")
 DEAD_PORT_URL = "http://127.0.0.1:9"
 
 

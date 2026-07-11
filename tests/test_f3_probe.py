@@ -32,8 +32,9 @@ def _load():
 
 # ── Guard: allowlist prefix + denylist SUBSTRING, before any client ──────────
 @pytest.mark.parametrize("name", [
-    "murphy_eternal", "claude_eternal",            # exact live names
+    "murphy_eternal", "claude_eternal", "vault_eternal",   # exact live names
     "scratch_murphy_eternal_x", "scratch_claude_eternal",   # embedded (the twist)
+    "scratch_vault_eternal_x",                     # embedded vault (the twist)
     "murphy_eternal_scratch",                      # live substring, wrong prefix
     "", "scratch_",                                # empty / empty suffix
     "f3_scratch_probe",                            # f2-style name: wrong prefix

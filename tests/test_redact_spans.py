@@ -51,4 +51,6 @@ def test_lockstep_with_tool_digest_spans():
     ours = [p.pattern for p in redact_spans.SECRET_SPANS]
     theirs = [p.pattern for p in ingest_tool_digest._SECRET_SPANS]
     assert ours == theirs
+    assert ([p.flags for p in redact_spans.SECRET_SPANS]
+            == [p.flags for p in ingest_tool_digest._SECRET_SPANS])
     assert redact_spans.PRIVATE_TOKEN == ingest_tool_digest._PRIVATE_TOKEN
