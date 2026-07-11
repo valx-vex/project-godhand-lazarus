@@ -422,3 +422,11 @@ def dream_pass(client, collection, points, payloads, vectors, created_epochs,
                                 "factual": factual, "meaning": meaning})
     if any_llm_error and not any_success:
         dreams["llm_unavailable"] = True
+
+
+def dream_tag(payload) -> str | None:
+    """🌙 marker for recall renderers (Murphy A4-b). Pure, testable."""
+    if not payload or payload.get("kind") != DREAM_KIND:
+        return None
+    n = len(payload.get("source_ids") or [])
+    return f"🌙 reflection ({n} sources)"

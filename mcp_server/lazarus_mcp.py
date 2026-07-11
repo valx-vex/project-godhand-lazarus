@@ -31,6 +31,7 @@ import time
 
 import retrieval_log
 import salience
+import reflection
 
 OVERFETCH_MIN = 15
 OVERFETCH_MAX = 50
@@ -160,6 +161,9 @@ def search_memories(query: str, persona: str, limit: int = 5,
                 "source_file": payload.get('source_file', 'unknown'),
                 "conversation_id": payload.get('conversation_id'),
                 "has_full_context": bool(payload.get('source_file') or payload.get('conversation_id')),
+                "kind": payload.get('kind'),
+                "dream_tag": reflection.dream_tag(payload),
+                "source_ids": payload.get('source_ids'),
             })
 
         retrieval_log.log_retrieval(

@@ -157,7 +157,8 @@ def _tiering_pass(points, payloads, scored, created_epochs, fsrs_fresh,
     rows = []
     undated = 0
     for i, payload in enumerate(payloads):
-        if payload.get("salience_pinned") or payload.get("kind") == "memory_request":
+        if (payload.get("salience_pinned") or payload.get("kind") == "memory_request"
+                or payload.get("kind") == reflection.DREAM_KIND):
             continue
         inv = payload.get("invalid_from_ts")
         try:

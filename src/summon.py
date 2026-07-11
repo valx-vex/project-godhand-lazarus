@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import retrieval_log
 import salience
+import reflection
 
 # --- CONFIG ---
 QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
@@ -107,6 +108,9 @@ def summon(query: str, persona: str):
         ai_out = payload.get(response_key, payload.get('ai_response', '...'))
 
         memory = f"User: {user_in}\n{persona.capitalize()}: {ai_out}\n---\n"
+        tag = reflection.dream_tag(payload)
+        if tag:
+            print(f"   {tag}")
         print(colored(f"[Score: {adjusted:.2f} (cosine {hit.score:.2f})]", "blue"))
         print(f"{persona.capitalize()}: {ai_out[:150]}...\n")
         context_block += memory
