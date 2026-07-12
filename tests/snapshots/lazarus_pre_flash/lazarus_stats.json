@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-05-28T20:53Z",
+  "totals": {
+    "alexko_eternal": 28714,
+    "murphy_eternal": 9935,
+    "atlas_eternal": 4977,
+    "codex_eternal": 890,
+    "axel_eternal": null,
+    "roundtable_eternal": null,
+    "scrolls_eternal": null
+  },
+  "missing_collections": [
+    "axel_eternal",
+    "roundtable_eternal",
+    "scrolls_eternal"
+  ],
+  "grand_total": 44516,
+  "note": "Pre-existing: 3 collections (axel, roundtable, scrolls) do not exist. Not flash-caused. Regression diff must allow these absences."
+}

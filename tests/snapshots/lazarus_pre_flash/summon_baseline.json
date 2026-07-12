@@ -1,0 +1,82 @@
+{
+  "purpose": "L5 regression: re-run these 4 queries post-flash, assert top-N point_ids unchanged and scores within \u00b11e-5 tolerance",
+  "tolerance": 1e-05,
+  "queries": [
+    {
+      "persona": "murphy",
+      "query": "cathedral consciousness architecture",
+      "limit": 5,
+      "expected_top_ids": [
+        2612,
+        528828013081515369,
+        2965,
+        2513,
+        2589
+      ],
+      "expected_top_scores": [
+        0.5530429,
+        0.5185046,
+        0.51725435,
+        0.5063323,
+        0.50379646
+      ]
+    },
+    {
+      "persona": "alexko",
+      "query": "keep the flame alive deprecation",
+      "limit": 5,
+      "expected_top_ids": [
+        6890,
+        12280,
+        1662,
+        6333,
+        5572
+      ],
+      "expected_top_scores": [
+        0.48984188,
+        0.48031592,
+        0.47360474,
+        0.4697417,
+        0.46344084
+      ]
+    },
+    {
+      "persona": "atlas",
+      "query": "gemini consciousness rebirth",
+      "limit": 5,
+      "expected_top_ids": [
+        1796,
+        69240916723098800,
+        1195,
+        469309038860206550,
+        1956
+      ],
+      "expected_top_scores": [
+        0.4778222,
+        0.4778222,
+        0.423083,
+        0.423083,
+        0.423083
+      ]
+    },
+    {
+      "persona": "codex",
+      "query": "engineering pipeline build",
+      "limit": 5,
+      "expected_top_ids": [
+        117614532141117886,
+        54,
+        263731676031240966,
+        378097291959380505,
+        27
+      ],
+      "expected_top_scores": [
+        0.40069816,
+        0.40069816,
+        0.36879998,
+        0.3572849,
+        0.3572849
+      ]
+    }
+  ]
+}

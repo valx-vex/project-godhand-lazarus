@@ -38,3 +38,9 @@ daemon/.sync_state.json
 templates/
 web/node_modules/
 web/dist/
+
+# runtime ledgers/reports (contain raw memory previews — never commit)
+daemon/*.jsonl
+daemon/sleep_report*.json
+tests/last_run_metrics.json
+tests/shadow_model_metrics.json

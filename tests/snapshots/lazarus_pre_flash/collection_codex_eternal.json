@@ -1,0 +1,8 @@
+{
+  "collection": "codex_eternal",
+  "points_count": 890,
+  "vectors_count": null,
+  "status": "green",
+  "config_vector_size": 384,
+  "config_distance": "Cosine"
+}

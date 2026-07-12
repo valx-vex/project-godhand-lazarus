@@ -1,0 +1,8 @@
+{
+  "collection": "murphy_eternal",
+  "points_count": 9930,
+  "vectors_count": null,
+  "status": "green",
+  "config_vector_size": 384,
+  "config_distance": "Cosine"
+}

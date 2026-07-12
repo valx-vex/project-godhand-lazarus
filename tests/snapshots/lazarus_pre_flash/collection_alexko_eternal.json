@@ -1,0 +1,8 @@
+{
+  "collection": "alexko_eternal",
+  "points_count": 28714,
+  "vectors_count": null,
+  "status": "green",
+  "config_vector_size": 384,
+  "config_distance": "Cosine"
+}
