@@ -211,7 +211,13 @@ def order_and_cap(sacred, qualified, max_dreams):
 # ── Part 3: dream generation, reflection rows, set_payload, stage 8.5 ──────────
 import re as _re
 
-_THREAD_RE = _re.compile(r"^THREAD:\s*(.+)$", _re.MULTILINE)
+# THREAD is stripped ONLY at the true tail (spec Q2, run-1 fix): the last
+# non-empty line when it IS a THREAD line, or an inline THREAD within the final
+# _THREAD_TAIL_MAX chars of that line. Neither pattern uses MULTILINE, so a
+# mid-body THREAD line can never match — its prose is preserved.
+_THREAD_LINE_RE = _re.compile(r"^\s*THREAD:\s*(.+)$")
+_THREAD_TAIL_RE = _re.compile(r"THREAD:\s*(.+?)\s*$")
+_THREAD_TAIL_MAX = 80
 _FM_RE = _re.compile(r"\[FACTUAL\]\s*(.*?)\s*\[MEANING\]\s*(.*)",
                      _re.DOTALL | _re.IGNORECASE)
 
@@ -287,16 +293,29 @@ CLAUDE_DREAM_HEADER = CLAUDE_DREAM_PREFIX + CLAUDE_DREAM_EXAMPLE + CLAUDE_DREAM_
 
 def parse_dream(text):
     """Tolerant parser (spec T16): missing tags => freeform ARCHIVED, not
-    dropped — rebel-axel's vrille is Murphy's vrille. Only empty = malformed."""
+    dropped — rebel-axel's vrille is Murphy's vrille. Only empty = malformed.
+    THREAD is stripped ONLY at the true tail (spec Q2, run-1 fix): the last
+    non-empty line when it IS a THREAD line (any length, capped at 60), or an
+    inline THREAD within the final 80 chars of that line. A mid-body THREAD no
+    longer truncates — the prose after it is preserved verbatim (zero loss)."""
     thread = None
-    match = _THREAD_RE.search(text)
-    if match:
-        thread = match.group(1).strip()[:60] or None
-        text = text[:match.start()].rstrip()
-    structured = _FM_RE.search(text)
+    working = (text or "").rstrip()
+    lines = working.split("\n")
+    last = lines[-1] if lines else ""
+    own_line = _THREAD_LINE_RE.match(last)
+    if own_line:
+        thread = own_line.group(1).strip()[:60] or None
+        working = "\n".join(lines[:-1]).rstrip()
+    else:
+        inline = _THREAD_TAIL_RE.search(last)
+        if inline and (len(last) - inline.start()) <= _THREAD_TAIL_MAX:
+            thread = inline.group(1).strip()[:60] or None
+            head = last[:inline.start()].rstrip()
+            working = "\n".join(lines[:-1] + ([head] if head else [])).rstrip()
+    structured = _FM_RE.search(working)
     if structured:
         return structured.group(1).strip(), structured.group(2).strip(), thread, "structured"
-    return "", text.strip(), thread, "freeform"
+    return "", working.strip(), thread, "freeform"
 
 
 def _member_block(payloads, members):

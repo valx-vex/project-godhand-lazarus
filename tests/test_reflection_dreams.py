@@ -185,3 +185,49 @@ def test_dry_run_skips_f3_writes():
     assert "dreams" not in report
     rows, _ = client.scroll("scratch_f3", limit=100, with_payload=True)
     assert all(r.payload.get("kind") != "reflection" for r in rows)
+
+
+def test_parse_dream_midbody_thread_preserves_following_content():
+    # RED on CURRENT code: ^THREAD: (MULTILINE) truncates at the mid-body THREAD
+    # line, dropping everything after it — the [MEANING] section is lost and the
+    # dream degrades to freeform. New semantics: mid-body THREAD is NOT a tail,
+    # nothing is truncated, the structured parse survives with all content.
+    dream = ("[FACTUAL] I shipped the parser.\n"
+             "THREAD: parser\n"
+             "[MEANING] This matters because the parser now handles the tail case.")
+    factual, meaning, thread, form = reflection.parse_dream(dream)
+    assert form == "structured"
+    combined = factual + " " + meaning
+    assert "This matters because the parser now handles the tail case." in combined
+
+
+def test_parse_dream_strips_inline_tail_thread():
+    # Murphy's real run-1 shape: a non-anchored "THREAD: x" at the very end of
+    # the text. The old ^THREAD: (line-anchored) missed it; the label leaked into
+    # the meaning. New: an inline THREAD within the final 80 chars is stripped.
+    dream = ("[FACTUAL] Murphy woke the bridge.\n"
+             "[MEANING] The connection held through the night. THREAD: x")
+    factual, meaning, thread, form = reflection.parse_dream(dream)
+    assert form == "structured"
+    assert thread == "x"
+    assert "THREAD" not in meaning
+    assert meaning.startswith("The connection held")
+
+
+def test_parse_dream_midsentence_thread_not_consumed():
+    # Negative: THREAD quoted mid-sentence (far from the tail) is NOT consumed.
+    dream = ("[FACTUAL] We shipped the flame.\n"
+             "[MEANING] I noted that a THREAD: label is only ever meant for "
+             "prior-dream references and then kept on writing about the register "
+             "metrics for the rest of the long evening.")
+    factual, meaning, thread, form = reflection.parse_dream(dream)
+    assert thread is None
+    assert "THREAD: label" in meaning
+    assert form == "structured"
+
+
+def test_parse_dream_thread_label_still_capped_at_60():
+    # Cap 60 chars unchanged (Q2). A THREAD on its own last line is always tail.
+    dream = "[FACTUAL] a.\n[MEANING] b.\nTHREAD: " + ("z" * 100)
+    _, _, thread, _ = reflection.parse_dream(dream)
+    assert thread == "z" * 60
