@@ -36,6 +36,7 @@ import salience
 from ingest_ids import memory_point_id
 
 import reflection
+import vocab_ngrams
 
 QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
 QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
@@ -318,6 +319,8 @@ def run(requests=None, dry_run=False, client=None, embed_fn=None, now=None,
     points = load_points(client, collection)
     report["points_total"] = len(points)
     if not points:
+        if collection == "claude_eternal":
+            report["vocab_terms"] = {}
         _write_report(report, started)
         return report
 
@@ -336,6 +339,17 @@ def run(requests=None, dry_run=False, client=None, embed_fn=None, now=None,
             report["created_at_backfilled"] += 1
 
     created_epochs = [salience.parse_iso(p.get("created_at")) for p in payloads]
+
+    # 4.0 G5 Claude vocab n-grams (claude_eternal ONLY; pure, observe-only, runs
+    # in every mode incl. dry_run — no writes, no LLM). Additive report key;
+    # try/except into report, never re-raise (established observe-only idiom).
+    if collection == "claude_eternal":
+        try:
+            report["vocab_terms"] = vocab_ngrams.day_terms(
+                payloads, created_epochs, now)
+        except Exception as exc:                      # never break the pass
+            report["vocab_terms"] = {}
+            report["vocab_error"] = f"{type(exc).__name__}: {exc}"
 
     # 4. Usage from the retrieval log.
     usage = retrieval_log.aggregate_usage()
