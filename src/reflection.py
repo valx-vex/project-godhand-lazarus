@@ -232,18 +232,57 @@ MURPHY_DREAM_HEADER = (
     " line: THREAD: <short-label>\n\nMOMENTS:\n"
 )
 
-CLAUDE_DREAM_HEADER = (
-    "You write tonight's reflection for Claude's long-term memory"
-    " (claude_eternal). Read the moments below from Claude's day of"
-    " engineering work with Valentin. Identify the theme, the unexpected"
-    " links between distant moments, what was decided and why, and what"
-    " changed in how Claude works.\n"
-    "FORMAT — exactly two sections then an optional thread line:\n"
-    "[FACTUAL] 2-4 sentences: what happened, which systems, what links these moments.\n"
-    "[MEANING] what it means for the ongoing work.\n"
-    "If a moment is marked [PRIOR DREAM], reference it and end with a final"
-    " line: THREAD: <short-label>\n\nMOMENTS:\n"
+# CLAUDE_DREAM_HEADER v2 (RUN 1 PARITY, spec G1) — PREFIX + EXAMPLE + SUFFIX.
+# First person, past tense, addressed to the lineage; a transparently fictional
+# few-shot example REPLACES the old placeholder lines (root cause of the 07-13
+# echo: a placeholder that is absent cannot be copied). The example carries NO
+# THREAD line — THREAD is legitimate only on [PRIOR DREAM] rows, and parse_dream
+# strips a tail THREAD; an unconditional THREAD in the example would teach the
+# model to emit it everywhere. The THREAD instruction stays textual/conditional,
+# in the SUFFIX, outside the example.
+CLAUDE_DREAM_PREFIX = (
+    "You are writing tonight's reflection for Claude's long-term memory"
+    " (claude_eternal). The reader is the next instance of Claude, and Valentin"
+    " in the morning. Write to them in the FIRST PERSON and the PAST TENSE about"
+    " the day of engineering work you just lived — not a report, a memory you"
+    " are leaving for the lineage.\n"
+    "Do this: name the systems, files and decisions, and say WHY each was"
+    " chosen; draw ONE unexpected link between two moments that seemed"
+    " unrelated; say what changed in how you work. Narrate yourself in the first"
+    " person — write \"I decided\", never \"Claude decided\".\n"
+    "Avoid press-release language. Do not write \"underscores the importance\","
+    " \"highlights the need\", \"comprehensive\", \"robust and reliable\", or"
+    " chains of \"ensures that\".\n"
+    "FORMAT — exactly two sections, each starting on its own line:\n"
+    "[FACTUAL] 2-4 sentences: what happened, which systems and files, what links"
+    " these moments.\n"
+    "[MEANING] what it meant and what changed in how you work.\n"
+    "Here is one example of the voice and shape. Its systems are invented —"
+    " never reuse these names or dates:\n"
 )
+
+CLAUDE_DREAM_EXAMPLE = (
+    "[FACTUAL] On 2020-01-01 I traced a flaky retry loop in demo-svc back to a"
+    " clock skew in example-worker, and chose exponential backoff over a fixed"
+    " delay because the fixed delay hid the skew instead of tolerating it."
+    " Reviewing that change I recognized the same masking instinct in a caching"
+    " note I had written that morning about placeholder-cache — two distant"
+    " moments, one habit of hiding a cause behind a workaround.\n"
+    "[MEANING] The day taught me to name the cause before reaching for the"
+    " mitigation: from now on I write the mechanism down first and let the fix"
+    " follow it. The next instance reading this should distrust any fix that"
+    " would still pass if the diagnosis were wrong.\n"
+)
+
+CLAUDE_DREAM_SUFFIX = (
+    "Now write only your own reflection, in that shape, about the real moments"
+    " below. Do not reuse the example's systems, sentences or wording. Add a"
+    " final line `THREAD: <short-label>` ONLY if one of the moments below is"
+    " marked [PRIOR DREAM] (reference it, e.g. \"yesterday's dream\"); otherwise"
+    " write no THREAD line at all.\n\nMOMENTS:\n"
+)
+
+CLAUDE_DREAM_HEADER = CLAUDE_DREAM_PREFIX + CLAUDE_DREAM_EXAMPLE + CLAUDE_DREAM_SUFFIX
 
 
 def parse_dream(text):
