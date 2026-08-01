@@ -61,10 +61,33 @@ def get_client() -> QdrantClient:
     return QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
 
 
-def _default_embed(texts):
+_MODEL = None
+
+
+def _load_model():
+    """One SentenceTransformer, cache-first.
+
+    Read the HF cache before the network: the weights are already on disk, so
+    a Hub round-trip here buys nothing and can fail. On 2026-07-24 it did —
+    something closed huggingface_hub's *shared* httpx client in place (its own
+    docstring: "you should not close it manually"), so every construction
+    raised `RuntimeError: Cannot send a request, as the client has been
+    closed.` and both brains' salience passes returned None for the night.
+    Falls back to a normal online load so a cold cache still bootstraps."""
     from sentence_transformers import SentenceTransformer
-    model = SentenceTransformer(MODEL_NAME)
-    return [vector.tolist() for vector in model.encode(list(texts))]
+    try:
+        return SentenceTransformer(MODEL_NAME, local_files_only=True)
+    except Exception:
+        return SentenceTransformer(MODEL_NAME)
+
+
+def _default_embed(texts):
+    """Embed via a process-wide model. Rebuilding per call cost ~5 loads a
+    night, each one a network round-trip and a chance to hit a dead client."""
+    global _MODEL
+    if _MODEL is None:
+        _MODEL = _load_model()
+    return [vector.tolist() for vector in _MODEL.encode(list(texts))]
 
 
 def load_points(client, collection=COLLECTION_NAME):

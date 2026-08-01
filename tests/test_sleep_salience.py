@@ -438,3 +438,78 @@ def test_tiering_computed_in_dry_run(monkeypatch, tmp_path):
     report = sleep_salience.run(client=client, embed_fn=fake_embed, now=now,
                                 dry_run=True)
     assert report["tiering_candidates_total"] == 2         # report-only = dry-safe
+
+
+# --- embed model loading (2026-07-24 sleep outage) -------------------------
+# The nightly salience pass died with
+#   RuntimeError: Cannot send a request, as the client has been closed.
+# because _default_embed rebuilt SentenceTransformer on every call and each
+# build hit the HF Hub, even though the weights are already cached locally.
+
+class _FakeST:
+    """Records every construction so the tests can count model loads."""
+    calls = []
+
+    def __init__(self, name, **kwargs):
+        type(self).calls.append((name, kwargs))
+        self.name = name
+
+    def encode(self, texts):
+        return [_FakeVec() for _ in texts]
+
+
+class _FakeVec:
+    def tolist(self):
+        return [0.0, 0.0, 0.0, 0.0]
+
+
+def _install_fake_st(monkeypatch, cls):
+    import sentence_transformers
+    monkeypatch.setattr(sentence_transformers, "SentenceTransformer", cls)
+    monkeypatch.setattr(sleep_salience, "_MODEL", None, raising=False)
+    cls.calls = []
+
+
+def test_default_embed_loads_the_model_once_per_process(monkeypatch):
+    _install_fake_st(monkeypatch, _FakeST)
+    sleep_salience._default_embed(["a"])
+    sleep_salience._default_embed(["b"])
+    sleep_salience._default_embed(["c"])
+    assert len(_FakeST.calls) == 1, (
+        f"model rebuilt {len(_FakeST.calls)}x — each rebuild is an HF Hub "
+        "round-trip and a chance to hit a closed httpx client")
+
+
+def test_default_embed_reads_the_local_cache_first(monkeypatch):
+    _install_fake_st(monkeypatch, _FakeST)
+    sleep_salience._default_embed(["a"])
+    name, kwargs = _FakeST.calls[0]
+    assert name == sleep_salience.MODEL_NAME
+    assert kwargs.get("local_files_only") is True, (
+        "weights are in the HF cache; the nightly pass must not touch the network")
+
+
+def test_default_embed_falls_back_online_when_cache_is_cold(monkeypatch):
+    class _ColdCacheST(_FakeST):
+        def __init__(self, name, **kwargs):
+            if kwargs.get("local_files_only"):
+                raise OSError("not cached locally")
+            super().__init__(name, **kwargs)
+
+    _install_fake_st(monkeypatch, _ColdCacheST)
+    vectors = sleep_salience._default_embed(["a"])
+    assert vectors == [[0.0, 0.0, 0.0, 0.0]]
+    assert _ColdCacheST.calls, "cold cache must still fall back to a normal load"
+
+
+def test_default_embed_survives_a_closed_hub_client(monkeypatch):
+    """The exact 2026-07-24 state: shared httpx client closed in place."""
+    class _ClosedClientST(_FakeST):
+        def __init__(self, name, **kwargs):
+            if not kwargs.get("local_files_only"):
+                raise RuntimeError(
+                    "Cannot send a request, as the client has been closed.")
+            super().__init__(name, **kwargs)
+
+    _install_fake_st(monkeypatch, _ClosedClientST)
+    assert sleep_salience._default_embed(["a"]) == [[0.0, 0.0, 0.0, 0.0]]
